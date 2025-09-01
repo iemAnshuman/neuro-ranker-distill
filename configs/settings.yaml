@@ -1,0 +1,24 @@
+seed: 42
+max_len: 256
+bm25:
+top_k: 100
+training:
+teacher:
+lr: 2e-5
+batch: 16
+epochs: 1
+student:
+lr: 3e-5
+batch: 64
+epochs: 1
+temperature: 3.0
+in_batch_negs: true
+hard_negs: 3
+ips:
+enabled: false
+eta: 1.0 # click noise
+position_bias: [1.0, 0.7, 0.55, 0.45, 0.38, 0.33, 0.3, 0.27, 0.25, 0.23]
+freshness:
+half_life_days: 14
+safety:
+banned_terms: ["nsfw", "malware", "violence"]
