@@ -1,0 +1,64 @@
+=============================================================================
+Python & Environment
+=============================================================================
+Virtual environment directory
+.venv/
+venv/
+env/
+
+Python cache files
+pycache/
+*.pyc
+*.pyo
+*.pyd
+
+Build artifacts
+build/
+dist/
+*.egg-info/
+*.so
+
+=============================================================================
+Data & Indexes (VERY IMPORTANT)
+=============================================================================
+Ignore all large data files. Keep the directory structure but not the content.
+Add a README.md inside your data folders explaining how to get the data.
+data/msmarco-full/
+data/msmarco-mini/
+data/.tsv
+data/.gz
+data/*.jsonl
+
+Ignore the large Lucene search index. It can be rebuilt from the data.
+lucene-index/
+*/lucene-index/
+
+=============================================================================
+Model Artifacts & Runs
+=============================================================================
+Ignore directories for trained models and experiment runs
+runs/
+
+Ignore the directory for exported models (ONNX, etc.)
+out/
+
+Ignore any standalone model files
+*.pt
+*.onnx
+*.onnx.data
+
+=============================================================================
+IDE & System Files
+=============================================================================
+IDE-specific settings
+.idea/
+.vscode/
+
+macOS system files
+.DS_Store
+
+Windows system files
+Thumbs.db
+
+Jupyter Notebook checkpoints
+.ipynb_checkpoints
