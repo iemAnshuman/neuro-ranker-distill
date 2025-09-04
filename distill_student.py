@@ -4,18 +4,30 @@ from src.neuro_ranker.trainer_student import StudentTrainer, QP
 from src.neuro_ranker.utils import set_seed
 from torch.utils.data import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from tqdm import tqdm
 
-# --- NEW DATASET CLASS ---
-# This class generates teacher scores on-the-fly, avoiding the initial bottleneck.
+# --- UPDATED DATASET CLASS ---
+# This class now pre-filters pairs to prevent KeyErrors during training.
 class DistillDS(Dataset):
     def __init__(self, mini_dataset, teacher_model, teacher_tok, max_len):
         self.mini = mini_dataset
-        self.qrels = list(mini_dataset.qrels)
         self.qs = dict(mini_dataset.qs)
         self.ps = mini_dataset.ps
         self.T = teacher_model
         self.T_tok = teacher_tok
         self.max_len = max_len
+
+        # --- FIX ---
+        # Pre-filter qrels to ensure all qids and pids have corresponding text entries.
+        # This prevents the DataLoader from crashing on missing keys.
+        print("Validating query-passage pairs...")
+        self.qrels = []
+        for qid, pid in tqdm(list(mini_dataset.qrels), desc="Filtering pairs"):
+            if qid in self.qs and pid in self.ps:
+                self.qrels.append((qid, pid))
+        
+        print(f"Found {len(self.qrels)} valid pairs out of {len(mini_dataset.qrels)} total.")
+        # --- END FIX ---
 
     def __len__(self):
         return len(self.qrels)
