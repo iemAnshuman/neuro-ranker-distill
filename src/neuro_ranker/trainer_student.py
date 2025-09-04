@@ -80,8 +80,12 @@ class StudentTrainer:
 		os.makedirs(out_dir, exist_ok=True)
 		# The 'items' is now the dataset itself, so we don't need to wrap it in QPDS
 		ds = items
-		# Use num_workers=2 for parallel data loading in Colab
-		dl = DataLoader(ds, batch_size=batch, shuffle=True, num_workers=2)
+		
+		# --- FIX ---
+		# Changed num_workers from 2 to 0 to prevent CUDA errors in forked processes.
+		# This forces data loading to happen in the main process.
+		dl = DataLoader(ds, batch_size=batch, shuffle=True, num_workers=0)
+		# --- END FIX ---
 
 		opt = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
 		
