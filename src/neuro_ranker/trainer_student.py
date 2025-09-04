@@ -52,15 +52,18 @@ class QPDS(Dataset):
 		item = self.items[idx]
 		q_enc = self.qtok(item.query, max_length=self.max_len, padding='max_length', truncation=True, return_tensors='pt')
 		p_enc = self.ptok(item.passage, max_length=self.max_len, padding='max_length', truncation=True, return_tensors='pt')
-		return {
-			'q_input_ids': q_enc['input_ids'].squeeze(0),
-			'q_attn': q_enc['attention_mask'].squeeze(0),
-			'p_input_ids': p_enc['input_ids'].squeeze(0),
-			'p_attn': p_enc['attention_mask'].squeeze(0),
-			'tlogit': torch.tensor(item.label, dtype=torch.float)
-		}
+		# This part now needs to handle the output from our new on-the-fly DistillDS
+		if isinstance(item, QP):
+			return {
+				'q_input_ids': q_enc['input_ids'].squeeze(0),
+				'q_attn': q_enc['attention_mask'].squeeze(0),
+				'p_input_ids': p_enc['input_ids'].squeeze(0),
+				'p_attn': p_enc['attention_mask'].squeeze(0),
+				'tlogit': torch.tensor(item.label, dtype=torch.float)
+			}
+		# This handles the case where the dataset itself returns a dictionary
+		return item
 
-# Removed the placeholder kd_ce function as it's now imported
 
 class StudentTrainer:
 	def __init__(self, model_name: str, lr: float, max_len: int, temperature: float = 3.0):
@@ -70,17 +73,22 @@ class StudentTrainer:
 		self.lr = lr
 		self.max_len = max_len
 		self.T = temperature
+		if torch.cuda.is_available():
+			self.model.to("cuda")
 
-	def fit(self, items: List[QP], out_dir: str, epochs: int = 1, batch: int = 64, ips=False, save_every: int = 1000):
+	def fit(self, items: Dataset, out_dir: str, epochs: int = 1, batch: int = 64, ips=False, save_every: int = 1000):
 		os.makedirs(out_dir, exist_ok=True)
-		ds = QPDS(items, self.qtok, self.ptok, self.max_len)
-		dl = DataLoader(ds, batch_size=batch, shuffle=True, num_workers=0)
+		# The 'items' is now the dataset itself, so we don't need to wrap it in QPDS
+		ds = items
+		# Use num_workers=2 for parallel data loading in Colab
+		dl = DataLoader(ds, batch_size=batch, shuffle=True, num_workers=2)
 
 		opt = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
 		
 		start_epoch = 0
 		global_step = 0
 		best_loss = 1e9
+		path = None
 
 		# --- RESUME LOGIC ---
 		ckpt_path = os.path.join(out_dir, 'latest_checkpoint.pt')
@@ -106,12 +114,27 @@ class StudentTrainer:
 					continue
 
 				if torch.cuda.is_available():
-					for k in batch_x:
-						batch_x[k] = batch_x[k].to(self.model.encoder.device)
+					# The QPDS class already returns tensors, but the new on-the-fly loader might not.
+					# Let's ensure everything is on the correct device.
+					# Note: The new DistillDS in distill_student.py now handles the raw data,
+					# so this trainer needs to tokenize it. We'll adjust QPDS to handle both.
+					q_enc = self.qtok(batch_x['query'], max_length=self.max_len, padding='max_length', truncation=True, return_tensors='pt')
+					p_enc = self.ptok(batch_x['passage'], max_length=self.max_len, padding='max_length', truncation=True, return_tensors='pt')
+					
+					q_input_ids = q_enc['input_ids'].to(self.model.encoder.device)
+					q_attn = q_enc['attention_mask'].to(self.model.encoder.device)
+					p_input_ids = p_enc['input_ids'].to(self.model.encoder.device)
+					p_attn = p_enc['attention_mask'].to(self.model.encoder.device)
+					tlogit = batch_x['label'].to(self.model.encoder.device)
+				else:
+					q_input_ids, q_attn = batch_x['q_input_ids'], batch_x['q_attn']
+					p_input_ids, p_attn = batch_x['p_input_ids'], batch_x['p_attn']
+					tlogit = batch_x['tlogit']
 
-				s_scores, q, p = self.model(batch_x['q_input_ids'], batch_x['q_attn'], batch_x['p_input_ids'], batch_x['p_attn'])
+
+				s_scores, q, p = self.model(q_input_ids, q_attn, p_input_ids, p_attn)
 				st_logits = torch.stack([-s_scores, s_scores], dim=1)
-				tch_logits = torch.stack([-batch_x['tlogit'], batch_x['tlogit']], dim=1)
+				tch_logits = torch.stack([-tlogit, tlogit], dim=1)
 				
 				loss_kd = kd_ce(st_logits, tch_logits, self.T)
 				loss = loss_kd
@@ -137,8 +160,7 @@ class StudentTrainer:
 			print(f"Epoch {ep+1} avg loss: {avg:.4f}")
 			if avg < best_loss:
 				best_loss = avg
-				best_path = os.path.join(out_dir, 'best.pt')
-				torch.save({'model': self.model.state_dict()}, best_path)
+				path = os.path.join(out_dir, 'best.pt')
+				torch.save({'model': self.model.state_dict()}, path)
 
-		final_path = os.path.join(out_dir, 'best.pt')
-		return final_path if os.path.exists(final_path) else "No model saved."
+		return path if path and os.path.exists(path) else "No model saved."
