@@ -71,18 +71,40 @@ class StudentTrainer:
 		self.max_len = max_len
 		self.T = temperature
 
-	def fit(self, items: List[QP], out_dir: str, epochs: int = 1, batch: int = 64, ips=False):
+	def fit(self, items: List[QP], out_dir: str, epochs: int = 1, batch: int = 64, ips=False, save_every: int = 1000):
+		os.makedirs(out_dir, exist_ok=True)
 		ds = QPDS(items, self.qtok, self.ptok, self.max_len)
 		dl = DataLoader(ds, batch_size=batch, shuffle=True, num_workers=0)
 
 		opt = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
+		
+		start_epoch = 0
+		global_step = 0
 		best_loss = 1e9
-		path = None
-		for ep in range(epochs):
+
+		# --- RESUME LOGIC ---
+		ckpt_path = os.path.join(out_dir, 'latest_checkpoint.pt')
+		if os.path.exists(ckpt_path):
+			print(f"Resuming student training from checkpoint: {ckpt_path}")
+			checkpoint = torch.load(ckpt_path)
+			self.model.load_state_dict(checkpoint['model_state_dict'])
+			opt.load_state_dict(checkpoint['optimizer_state_dict'])
+			start_epoch = checkpoint['epoch']
+			global_step = checkpoint['global_step']
+			best_loss = checkpoint.get('best_loss', 1e9)
+			print(f"Resuming from Epoch {start_epoch}, Step {global_step}")
+		# --------------------
+
+		self.model.train()
+		for ep in range(start_epoch, epochs):
 			run = 0.0
-			self.model.train()
-			for batch_x in tqdm(dl, desc=f"student ep{ep+1}"):
-				# Move batch to GPU if available
+			# Correctly handle progress bar for resumed epochs
+			prog_bar = tqdm(dl, desc=f"student ep{ep+1}", initial=global_step % len(dl), total=len(dl))
+			for i, batch_x in enumerate(prog_bar):
+				# Skip steps already completed in a resumed epoch
+				if global_step > 0 and i < (global_step % len(dl)):
+					continue
+
 				if torch.cuda.is_available():
 					for k in batch_x:
 						batch_x[k] = batch_x[k].to(self.model.encoder.device)
@@ -97,13 +119,26 @@ class StudentTrainer:
 				loss.backward()
 				opt.step()
 				run += float(loss.item())
+				global_step += 1
+				
+				# --- PERIODIC CHECKPOINTING ---
+				if global_step % save_every == 0:
+					torch.save({
+						'epoch': ep,
+						'global_step': global_step,
+						'model_state_dict': self.model.state_dict(),
+						'optimizer_state_dict': opt.state_dict(),
+						'loss': loss.item(),
+						'best_loss': best_loss
+					}, ckpt_path)
+				# ------------------------------
 
 			avg = run / max(1, len(dl))
 			print(f"Epoch {ep+1} avg loss: {avg:.4f}")
 			if avg < best_loss:
 				best_loss = avg
-				os.makedirs(out_dir, exist_ok=True)
-				path = os.path.join(out_dir, 'best.pt')
-				torch.save({'model': self.model.state_dict()}, path)
+				best_path = os.path.join(out_dir, 'best.pt')
+				torch.save({'model': self.model.state_dict()}, best_path)
 
-		return path if path else "No model saved, best_loss not improved"
+		final_path = os.path.join(out_dir, 'best.pt')
+		return final_path if os.path.exists(final_path) else "No model saved."
