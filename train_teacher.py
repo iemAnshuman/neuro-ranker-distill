@@ -14,13 +14,18 @@ p.add_argument('--out_dir', required=True)
 args = p.parse_args()
 set_seed(42)
 
+print("Loading MSMini dataset...")
 mini = MSMini(args.data_dir)
+print("Dataset loaded. Creating pairs...")
+
 pairs = []
 for (qid, pid) in mini.qrels:
     q = dict(mini.qs)[qid]
     psg = mini.ps[pid]
     pairs.append(Pair(q, psg, 1.0))
+print(f"{len(pairs)} pairs created. Initializing trainer...")
 
 trainer = TeacherTrainer(args.model, args.lr, args.max_len)
+print("Trainer initialized. Starting training...")
 best = trainer.fit(pairs, args.out_dir, epochs=args.epochs, batch=args.batch)
 print('saved', best)
