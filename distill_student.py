@@ -7,7 +7,6 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from tqdm import tqdm
 
 # --- UPDATED DATASET CLASS ---
-# This class now pre-filters pairs to prevent KeyErrors during training.
 class DistillDS(Dataset):
     def __init__(self, mini_dataset, teacher_model, teacher_tok, max_len):
         self.mini = mini_dataset
@@ -17,9 +16,6 @@ class DistillDS(Dataset):
         self.T_tok = teacher_tok
         self.max_len = max_len
 
-        # --- FIX ---
-        # Pre-filter qrels to ensure all qids and pids have corresponding text entries.
-        # This prevents the DataLoader from crashing on missing keys.
         print("Validating query-passage pairs...")
         self.qrels = []
         for qid, pid in tqdm(list(mini_dataset.qrels), desc="Filtering pairs"):
@@ -27,7 +23,6 @@ class DistillDS(Dataset):
                 self.qrels.append((qid, pid))
         
         print(f"Found {len(self.qrels)} valid pairs out of {len(mini_dataset.qrels)} total.")
-        # --- END FIX ---
 
     def __len__(self):
         return len(self.qrels)
@@ -37,15 +32,17 @@ class DistillDS(Dataset):
         q_text = self.qs[qid]
         p_text = self.ps[pid]
         
-        # Teacher scoring is now done here, for one item at a time
         enc = self.T_tok(q_text, p_text, truncation=True, padding='max_length', max_length=self.max_len, return_tensors='pt')
         with torch.no_grad():
-            # Move tensors to the same device as the model
             device = self.T.device
             inputs = {k: v.to(device) for k, v in enc.items()}
             logit = self.T(**{k:inputs[k] for k in ['input_ids','attention_mask']}).logits[0,0].item()
             
-        return QP(query=q_text, passage=p_text, label=logit)
+        # --- FIX ---
+        # Return a dictionary instead of a custom QP object.
+        # The DataLoader's default collate function can handle dictionaries.
+        return {"query": q_text, "passage": p_text, "label": logit}
+        # --- END FIX ---
 
 # --- MAIN SCRIPT (MODIFIED) ---
 def main():
@@ -80,7 +77,6 @@ def main():
     
     # Pass the dataset directly to the trainer
     trainer = StudentTrainer(args.student, args.lr, args.max_len, temperature=args.temp)
-    # The 'items' argument in fit() now expects a Dataset object, not a list
     best = trainer.fit(distill_dataset, args.out_dir, epochs=args.epochs, batch=args.batch)
     print('saved', best)
 
