@@ -1,0 +1,18 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.git
+.gitignore
+Dockerfile
+README.md
+tests/
+training_pipeline/
+data/
+# Exclude large model files if you are downloading them at runtime or mounting them.
+# If you want them baked into the image, remove this line.
+models/

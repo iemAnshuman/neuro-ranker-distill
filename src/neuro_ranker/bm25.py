@@ -2,6 +2,7 @@ import json
 from typing import List, Tuple
 from pyserini.search.lucene import LuceneSearcher
 
+
 class BM25:
     def __init__(self, index_dir: str, k1: float = 0.9, b: float = 0.4):
         self.searcher = LuceneSearcher(index_dir)

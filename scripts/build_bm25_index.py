@@ -10,12 +10,10 @@ parser = argparse.ArgumentParser(description="Builds a Pyserini BM25 index.")
 parser.add_argument(
     "--collection",
     required=True,
-    help="Path to the passages.jsonl file with 'pid' and 'text' fields."
+    help="Path to the passages.jsonl file with 'pid' and 'text' fields.",
 )
 parser.add_argument(
-    "--index_dir",
-    required=True,
-    help="Directory to store the Lucene index."
+    "--index_dir", required=True, help="Directory to store the Lucene index."
 )
 args = parser.parse_args()
 
@@ -30,19 +28,22 @@ print("Preparing data for Pyserini...")
 with tempfile.TemporaryDirectory() as temp_dir:
     temp_collection_path = Path(temp_dir) / "collection.jsonl"
     doc_count = 0
-    with open(collection_path, 'r') as infile, open(temp_collection_path, 'w') as outfile:
+    with (
+        open(collection_path, "r") as infile,
+        open(temp_collection_path, "w") as outfile,
+    ):
         for line in infile:
             try:
                 original_doc = json.loads(line)
                 # Remap keys from {"pid": ..., "text": ...} to {"id": ..., "contents": ...}
                 new_doc = {
                     "id": original_doc.get("pid"),
-                    "contents": original_doc.get("text")
+                    "contents": original_doc.get("text"),
                 }
                 if new_doc["id"] is None or new_doc["contents"] is None:
-                    continue # Skip malformed lines
+                    continue  # Skip malformed lines
 
-                outfile.write(json.dumps(new_doc) + '\n')
+                outfile.write(json.dumps(new_doc) + "\n")
                 doc_count += 1
             except json.JSONDecodeError:
                 print(f"Skipping malformed JSON line: {line.strip()}")
@@ -55,13 +56,22 @@ with tempfile.TemporaryDirectory() as temp_dir:
     # We use subprocess to call Pyserini's command-line indexing tool.
     # This is the standard and most reliable way to create an index.
     command = [
-        "python", "-m", "pyserini.index.lucene",
-        "--collection", "JsonCollection",
-        "--input", temp_dir,
-        "--index", str(index_path),
-        "--generator", "DefaultLuceneDocumentGenerator",
-        "--threads", "1",
-        "--storePositions", "--storeDocvectors", "--storeRaw"
+        "python",
+        "-m",
+        "pyserini.index.lucene",
+        "--collection",
+        "JsonCollection",
+        "--input",
+        temp_dir,
+        "--index",
+        str(index_path),
+        "--generator",
+        "DefaultLuceneDocumentGenerator",
+        "--threads",
+        "1",
+        "--storePositions",
+        "--storeDocvectors",
+        "--storeRaw",
     ]
 
     try:

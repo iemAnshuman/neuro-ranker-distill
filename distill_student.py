@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from tqdm import tqdm
 
+
 # --- UPDATED DATASET CLASS ---
 class DistillDS(Dataset):
     def __init__(self, mini_dataset, teacher_model, teacher_tok, max_len):
@@ -21,8 +22,10 @@ class DistillDS(Dataset):
         for qid, pid in tqdm(list(mini_dataset.qrels), desc="Filtering pairs"):
             if qid in self.qs and pid in self.ps:
                 self.qrels.append((qid, pid))
-        
-        print(f"Found {len(self.qrels)} valid pairs out of {len(mini_dataset.qrels)} total.")
+
+        print(
+            f"Found {len(self.qrels)} valid pairs out of {len(mini_dataset.qrels)} total."
+        )
 
     def __len__(self):
         return len(self.qrels)
@@ -31,31 +34,43 @@ class DistillDS(Dataset):
         qid, pid = self.qrels[idx]
         q_text = self.qs[qid]
         p_text = self.ps[pid]
-        
-        enc = self.T_tok(q_text, p_text, truncation=True, padding='max_length', max_length=self.max_len, return_tensors='pt')
+
+        enc = self.T_tok(
+            q_text,
+            p_text,
+            truncation=True,
+            padding="max_length",
+            max_length=self.max_len,
+            return_tensors="pt",
+        )
         with torch.no_grad():
             device = self.T.device
             inputs = {k: v.to(device) for k, v in enc.items()}
-            logit = self.T(**{k:inputs[k] for k in ['input_ids','attention_mask']}).logits[0,0].item()
-            
+            logit = (
+                self.T(**{k: inputs[k] for k in ["input_ids", "attention_mask"]})
+                .logits[0, 0]
+                .item()
+            )
+
         # --- FIX ---
         # Return a dictionary instead of a custom QP object.
         # The DataLoader's default collate function can handle dictionaries.
         return {"query": q_text, "passage": p_text, "label": logit}
         # --- END FIX ---
 
+
 # --- MAIN SCRIPT (MODIFIED) ---
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--data_dir', required=True)
-    p.add_argument('--teacher', required=True)
-    p.add_argument('--student', default='sentence-transformers/all-MiniLM-L6-v2')
-    p.add_argument('--epochs', type=int, default=1)
-    p.add_argument('--lr', type=float, default=3e-5)
-    p.add_argument('--batch', type=int, default=64)
-    p.add_argument('--max_len', type=int, default=256)
-    p.add_argument('--temp', type=float, default=3.0)
-    p.add_argument('--out_dir', required=True)
+    p.add_argument("--data_dir", required=True)
+    p.add_argument("--teacher", required=True)
+    p.add_argument("--student", default="sentence-transformers/all-MiniLM-L6-v2")
+    p.add_argument("--epochs", type=int, default=1)
+    p.add_argument("--lr", type=float, default=3e-5)
+    p.add_argument("--batch", type=int, default=64)
+    p.add_argument("--max_len", type=int, default=256)
+    p.add_argument("--temp", type=float, default=3.0)
+    p.add_argument("--out_dir", required=True)
     args = p.parse_args()
     set_seed(42)
 
@@ -63,22 +78,25 @@ def main():
     print("Loading teacher model...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
     ckpt = torch.load(args.teacher, map_location=device)
-    teacher_name = ckpt.get('name','microsoft/MiniLM-L12-H384-uncased')
+    teacher_name = ckpt.get("name", "microsoft/MiniLM-L12-H384-uncased")
     T_tok = AutoTokenizer.from_pretrained(teacher_name)
     T = AutoModelForSequenceClassification.from_pretrained(teacher_name, num_labels=1)
-    T.load_state_dict(ckpt['model'])
-    T.to(device) # Move teacher to GPU
+    T.load_state_dict(ckpt["model"])
+    T.to(device)  # Move teacher to GPU
     T.eval()
 
     # Create the on-the-fly dataset
     print("Setting up dataset...")
     mini = MSMini(args.data_dir)
     distill_dataset = DistillDS(mini, T, T_tok, args.max_len)
-    
+
     # Pass the dataset directly to the trainer
     trainer = StudentTrainer(args.student, args.lr, args.max_len, temperature=args.temp)
-    best = trainer.fit(distill_dataset, args.out_dir, epochs=args.epochs, batch=args.batch)
-    print('saved', best)
+    best = trainer.fit(
+        distill_dataset, args.out_dir, epochs=args.epochs, batch=args.batch
+    )
+    print("saved", best)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
