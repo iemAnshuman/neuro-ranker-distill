@@ -8,7 +8,14 @@ from tqdm import tqdm
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--data_dir", required=True)
+    # --- START OF MODIFICATION 1 ---
+    # Set your new path as the default and made it no longer required
+    p.add_argument(
+        "--data_dir",
+        default="../drive/MyDrive/ms_marco_project",
+        help="Path to the MS MARCO dataset"
+    )
+    # --- END OF MODIFICATION 1 ---
     p.add_argument("--model", default="microsoft/MiniLM-L12-H384-uncased")
     p.add_argument("--epochs", type=int, default=1)
     p.add_argument("--lr", type=float, default=2e-5)
@@ -17,8 +24,8 @@ def main():
     p.add_argument("--out_dir", required=True)
     args = p.parse_args()
 
-    # --- START OF MODIFICATION ---
-    # Check if a best model already exists
+    # --- START OF MODIFICATION 2 ---
+    # Re-adding the check for an existing model
     best_model_path = os.path.join(args.out_dir, "best.pt")
     if os.path.exists(best_model_path):
         print(f"Found existing trained model: {best_model_path}")
@@ -28,11 +35,11 @@ def main():
             return  # Exit the main function
         else:
             print("Proceeding with retraining...")
-    # --- END OF MODIFICATION ---
+    # --- END OF MODIFICATION 2 ---
 
     set_seed(42)
 
-    print("Loading MSMini dataset...")
+    print(f"Loading MSMini dataset from: {args.data_dir}...")
     mini = MSMini(args.data_dir)
     print("Dataset loaded. Creating pairs sequentially (optimized)...")
 

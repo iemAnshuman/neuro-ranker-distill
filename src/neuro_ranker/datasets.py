@@ -17,16 +17,25 @@ class MSMini:
     def __init__(self, data_dir: str):
         self.qs = []
         self.ps = {}
-        with open(os.path.join(data_dir, "queries.jsonl")) as f:
+        # --- START OF MODIFICATION ---
+        # Changed "queries.jsonl" to "queries.train.jsonl"
+        with open(os.path.join(data_dir, "queries.train.jsonl")) as f:
+        # --- END OF MODIFICATION ---
             for l in f:
                 o = json.loads(l)
                 self.qs.append((o["qid"], o["text"]))
-        with open(os.path.join(data_dir, "passages.jsonl")) as f:
+        # --- START OF MODIFICATION ---
+        # Changed "passages.jsonl" to "collection.jsonl"
+        with open(os.path.join(data_dir, "collection.jsonl")) as f:
+        # --- END OF MODIFICATION ---
             for l in f:
                 o = json.loads(l)
                 self.ps[o["pid"]] = o["text"]
         self.qrels = set()
-        with open(os.path.join(data_dir, "qrels.tsv")) as f:
+        # --- START OF MODIFICATION ---
+        # Changed "qrels.tsv" to "qrels.train.tsv"
+        with open(os.path.join(data_dir, "qrels.train.tsv")) as f:
+        # --- END OF MODIFICATION ---
             for l in f:
                 qid, _q0, pid, rel = l.strip().split("\t")
                 self.qrels.add((qid, pid))
