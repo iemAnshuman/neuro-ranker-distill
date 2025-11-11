@@ -1,4 +1,4 @@
-import argparse, torch
+import argparse, torch, os # <-- ADDED os
 from src.neuro_ranker.datasets import MSMini
 from src.neuro_ranker.trainer_student import StudentTrainer, QP
 from src.neuro_ranker.utils import set_seed
@@ -7,7 +7,6 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from tqdm import tqdm
 
 
-# --- UPDATED DATASET CLASS ---
 class DistillDS(Dataset):
     def __init__(self, mini_dataset, teacher_model, teacher_tok, max_len):
         self.mini = mini_dataset
@@ -52,26 +51,24 @@ class DistillDS(Dataset):
                 .item()
             )
 
-        # --- FIX ---
-        # Return a dictionary instead of a custom QP object.
-        # The DataLoader's default collate function can handle dictionaries.
         return {"query": q_text, "passage": p_text, "label": logit}
-        # --- END FIX ---
 
 
-# --- MAIN SCRIPT (MODIFIED) ---
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--data_dir", required=True)
-    p.add_argument("--teacher", required=True)
-    p.add_argument("--student", default="sentence-transformers/all-MiniLM-L6-v2")
-    p.add_argument("--epochs", type=int, default=1)
-    p.add_argument("--lr", type=float, default=3e-5)
-    p.add_argument("--batch", type=int, default=64)
-    p.add_argument("--max_len", type=int, default=256)
-    p.add_argument("--temp", type=float, default=3.0)
-    p.add_argument("--out_dir", required=True)
-    args = p.parse_args()
+# --- START OF MODIFICATION ---
+# Renamed 'main' to 'run_distillation' and made it accept 'args'
+def run_distillation(args):
+    # --- ADDED CHECK FOR EXISTING MODEL ---
+    best_model_path = os.path.join(args.out_dir, "best.pt")
+    if os.path.exists(best_model_path):
+        print(f"Found existing trained model: {best_model_path}")
+        response = input("Do you want to retrain? (This will overwrite the existing model) [y/N]: ")
+        if response.lower() != 'y':
+            print("Skipping training. Exiting.")
+            return  # Exit the function
+        else:
+            print("Proceeding with retraining...")
+    # --- END ADDED CHECK ---
+
     set_seed(42)
 
     # Load teacher model
@@ -82,15 +79,14 @@ def main():
     T_tok = AutoTokenizer.from_pretrained(teacher_name)
     T = AutoModelForSequenceClassification.from_pretrained(teacher_name, num_labels=1)
     T.load_state_dict(ckpt["model"])
-    T.to(device)  # Move teacher to GPU
+    T.to(device)
     T.eval()
 
     # Create the on-the-fly dataset
-    print("Setting up dataset...")
+    print(f"Setting up dataset from: {args.data_dir}...")
     mini = MSMini(args.data_dir)
     distill_dataset = DistillDS(mini, T, T_tok, args.max_len)
 
-    # Pass the dataset directly to the trainer
     trainer = StudentTrainer(args.student, args.lr, args.max_len, temperature=args.temp)
     best = trainer.fit(
         distill_dataset, args.out_dir, epochs=args.epochs, batch=args.batch
@@ -98,5 +94,20 @@ def main():
     print("saved", best)
 
 
+# --- START OF MODIFICATION 2 ---
+# This block now lets you run this file directly for testing
 if __name__ == "__main__":
-    main()
+    p = argparse.ArgumentParser()
+    p.add_argument("--data_dir", default="../drive/MyDrive/ms_marco_project", help="Path to the MS MARCO dataset")
+    p.add_argument("--teacher", required=True, help="Path to teacher best.pt")
+    p.add_argument("--student", default="sentence-transformers/all-MiniLM-L6-v2")
+    p.add_argument("--epochs", type=int, default=1)
+    p.add_argument("--lr", type=float, default=3e-5)
+    p.add_argument("--batch", type=int, default=64)
+    p.add_argument("--max_len", type=int, default=256)
+    p.add_argument("--temp", type=float, default=3.0)
+    p.add_argument("--out_dir", required=True)
+    args = p.parse_args()
+    
+    run_distillation(args) # Call the distillation function
+# --- END OF MODIFICATION 2 ---
