@@ -3,9 +3,6 @@ import uvicorn
 import sys
 import os
 
-# (sys.path fix removed as it's handled by 'pip install -e .')
-
-
 def run_server(args):
     """Starts the FastAPI development server."""
     print(f"噫 Starting NeuroRank API on {args.host}:{args.port}...")
@@ -16,22 +13,14 @@ def run_server(args):
 
 def run_teacher(args):
     """Runs the teacher training pipeline."""
-    # Import here to avoid issues if dependencies aren't installed
-    # --- START OF MODIFICATION ---
-    import train_teacher  # Changed from 'from training_pipeline...'
-    # --- END OF MODIFICATION ---
-
+    import train_teacher
     print("捉窶昨沛ｫ Starting Teacher (BERT) training...")
     train_teacher.run_training(args)
 
 
 def run_student(args):
     """Runs the student distillation pipeline."""
-    # Import here to avoid issues if dependencies aren't installed
-    # --- START OF MODIFICATION ---
-    import distill_student  # Changed from 'from training_pipeline...'
-    # --- END OF MODIFICATION ---
-
+    import distill_student
     print("雌 Starting Student (MiniLM) distillation...")
     distill_student.run_distillation(args)
 
@@ -53,11 +42,14 @@ def main():
     teacher_parser = subparsers.add_parser(
         "train-teacher", help="Train the teacher model"
     )
+    # --- START OF MODIFICATION ---
+    # Using the absolute path for Google Drive.
     teacher_parser.add_argument(
         "--data_dir",
-        default="../drive/MyDrive/ms_marco_project",
+        default="/content/drive/MyDrive/ms_marco_project",
         help="Path to the MS MARCO dataset"
     )
+    # --- END OF MODIFICATION ---
     teacher_parser.add_argument("--model", default="microsoft/MiniLM-L12-H384-uncased")
     teacher_parser.add_argument("--epochs", type=int, default=1)
     teacher_parser.add_argument("--lr", type=float, default=2e-5)
@@ -70,7 +62,14 @@ def main():
     student_parser = subparsers.add_parser(
         "train-student", help="Distill into student model"
     )
-    student_parser.add_argument("--data_dir", default="../drive/MyDrive/ms_marco_project", help="Path to the MS MARCO dataset")
+    # --- START OF MODIFICATION ---
+    # Using the absolute path for Google Drive.
+    student_parser.add_argument(
+        "--data_dir",
+        default="/content/drive/MyDrive/ms_marco_project",
+        help="Path to the MS MARCO dataset"
+    )
+    # --- END OF MODIFICATION ---
     student_parser.add_argument("--teacher", required=True, help="Path to teacher best.pt")
     student_parser.add_argument("--student", default="sentence-transformers/all-MiniLM-L6-v2")
     student_parser.add_argument("--epochs", type=int, default=1)
