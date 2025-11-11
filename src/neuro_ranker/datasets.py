@@ -17,23 +17,28 @@ class MSMini:
     def __init__(self, data_dir: str):
         self.qs = []
         self.ps = {}
+        
         # --- START OF MODIFICATION ---
-        # Changed path to look inside the 'queries' subdirectory
-        with open(os.path.join(data_dir, "queries", "train.jsonl")) as f:
+        # Point to 'processed_data/queries.jsonl'
+        with open(os.path.join(data_dir, "processed_data", "queries.jsonl")) as f:
         # --- END OF MODIFICATION ---
             for l in f:
                 o = json.loads(l)
                 self.qs.append((o["qid"], o["text"]))
         
-        # This one looks correct based on your screenshot
-        with open(os.path.join(data_dir, "collection.jsonl")) as f:
+        # --- START OF MODIFICATION ---
+        # Point to 'processed_data/passages.jsonl'
+        with open(os.path.join(data_dir, "processed_data", "passages.jsonl")) as f:
+        # --- END OF MODIFICATION ---
             for l in f:
                 o = json.loads(l)
                 self.ps[o["pid"]] = o["text"]
         
         self.qrels = set()
-        # This one also looks correct
-        with open(os.path.join(data_dir, "qrels.train.tsv")) as f:
+        # --- START OF MODIFICATION ---
+        # Point to 'processed_data/qrels.tsv'
+        with open(os.path.join(data_dir, "processed_data", "qrels.tsv")) as f:
+        # --- END OF MODIFICATION ---
             for l in f:
                 qid, _q0, pid, rel = l.strip().split("\t")
                 self.qrels.add((qid, pid))
