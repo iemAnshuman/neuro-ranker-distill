@@ -1,4 +1,4 @@
-import argparse, torch, os # <-- ADDED os
+import argparse, torch, os
 from src.neuro_ranker.datasets import MSMini
 from src.neuro_ranker.trainer_student import StudentTrainer, QP
 from src.neuro_ranker.utils import set_seed
@@ -54,26 +54,31 @@ class DistillDS(Dataset):
         return {"query": q_text, "passage": p_text, "label": logit}
 
 
-# --- START OF MODIFICATION ---
-# Renamed 'main' to 'run_distillation' and made it accept 'args'
 def run_distillation(args):
-    # --- ADDED CHECK FOR EXISTING MODEL ---
+    """Main distillation function, called by manage.py"""
     best_model_path = os.path.join(args.out_dir, "best.pt")
     if os.path.exists(best_model_path):
         print(f"Found existing trained model: {best_model_path}")
         response = input("Do you want to retrain? (This will overwrite the existing model) [y/N]: ")
         if response.lower() != 'y':
             print("Skipping training. Exiting.")
-            return  # Exit the function
+            return
         else:
             print("Proceeding with retraining...")
-    # --- END ADDED CHECK ---
+            
+    # Ensure the output directory exists
+    os.makedirs(args.out_dir, exist_ok=True)
 
     set_seed(42)
 
     # Load teacher model
-    print("Loading teacher model...")
+    print(f"Loading teacher model from: {args.teacher}...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    if not os.path.exists(args.teacher):
+        print(f"Error: Teacher model not found at {args.teacher}")
+        print("Please train the teacher model first or correct the --teacher path.")
+        return
+        
     ckpt = torch.load(args.teacher, map_location=device)
     teacher_name = ckpt.get("name", "microsoft/MiniLM-L12-H384-uncased")
     T_tok = AutoTokenizer.from_pretrained(teacher_name)
@@ -94,20 +99,32 @@ def run_distillation(args):
     print("saved", best)
 
 
-# --- START OF MODIFICATION 2 ---
-# This block now lets you run this file directly for testing
 if __name__ == "__main__":
+    # This block is for running this script directly
     p = argparse.ArgumentParser()
-    p.add_argument("--data_dir", default="../drive/MyDrive/ms_marco_project", help="Path to the MS MARCO dataset")
-    p.add_argument("--teacher", required=True, help="Path to teacher best.pt")
+    p.add_argument(
+        "--data_dir", 
+        default="/content/drive/MyDrive/ms_marco_project", 
+        help="Path to the MS MARCO dataset"
+    )
+    p.add_argument(
+        "--teacher", 
+        default="/content/drive/MyDrive/ms_marco_project/models/teacher/best.pt",
+        help="Path to teacher best.pt"
+    )
     p.add_argument("--student", default="sentence-transformers/all-MiniLM-L6-v2")
     p.add_argument("--epochs", type=int, default=1)
     p.add_argument("--lr", type=float, default=3e-5)
     p.add_argument("--batch", type=int, default=64)
     p.add_argument("--max_len", type=int, default=256)
     p.add_argument("--temp", type=float, default=3.0)
-    p.add_argument("--out_dir", required=True)
+    # --- START OF MODIFICATION ---
+    p.add_argument(
+        "--out_dir", 
+        default="/content/drive/MyDrive/ms_marco_project/models/student",
+        help="Output directory for student model"
+    )
+    # --- END OF MODIFICATION ---
     args = p.parse_args()
     
-    run_distillation(args) # Call the distillation function
-# --- END OF MODIFICATION 2 ---
+    run_distillation(args)

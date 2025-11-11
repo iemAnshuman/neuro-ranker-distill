@@ -42,42 +42,53 @@ def main():
     teacher_parser = subparsers.add_parser(
         "train-teacher", help="Train the teacher model"
     )
-    # --- START OF MODIFICATION ---
-    # Using the absolute path for Google Drive.
     teacher_parser.add_argument(
         "--data_dir",
         default="/content/drive/MyDrive/ms_marco_project",
         help="Path to the MS MARCO dataset"
     )
-    # --- END OF MODIFICATION ---
     teacher_parser.add_argument("--model", default="microsoft/MiniLM-L12-H384-uncased")
     teacher_parser.add_argument("--epochs", type=int, default=1)
     teacher_parser.add_argument("--lr", type=float, default=2e-5)
     teacher_parser.add_argument("--batch", type=int, default=16)
     teacher_parser.add_argument("--max_len", type=int, default=256)
-    teacher_parser.add_argument("--out_dir", required=True)
+    # --- START OF MODIFICATION ---
+    teacher_parser.add_argument(
+        "--out_dir", 
+        default="/content/drive/MyDrive/ms_marco_project/models/teacher",
+        help="Output directory for teacher model"
+    )
+    # --- END OF MODIFICATION ---
     teacher_parser.set_defaults(func=run_teacher)
 
     # --- Train Student Command ---
     student_parser = subparsers.add_parser(
         "train-student", help="Distill into student model"
     )
-    # --- START OF MODIFICATION ---
-    # Using the absolute path for Google Drive.
     student_parser.add_argument(
-        "--data_dir",
-        default="/content/drive/MyDrive/ms_marco_project",
+        "--data_dir", 
+        default="/content/drive/MyDrive/ms_marco_project", 
         help="Path to the MS MARCO dataset"
     )
-    # --- END OF MODIFICATION ---
-    student_parser.add_argument("--teacher", required=True, help="Path to teacher best.pt")
+    student_parser.add_argument(
+        "--teacher", 
+        # Set default teacher path to match new teacher output
+        default="/content/drive/MyDrive/ms_marco_project/models/teacher/best.pt",
+        help="Path to teacher best.pt"
+    )
     student_parser.add_argument("--student", default="sentence-transformers/all-MiniLM-L6-v2")
     student_parser.add_argument("--epochs", type=int, default=1)
     student_parser.add_argument("--lr", type=float, default=3e-5)
     student_parser.add_argument("--batch", type=int, default=64)
     student_parser.add_argument("--max_len", type=int, default=256)
     student_parser.add_argument("--temp", type=float, default=3.0)
-    student_parser.add_argument("--out_dir", required=True)
+    # --- START OF MODIFICATION ---
+    student_parser.add_argument(
+        "--out_dir", 
+        default="/content/drive/MyDrive/ms_marco_project/models/student",
+        help="Output directory for student model"
+    )
+    # --- END OF MODIFICATION ---
     student_parser.set_defaults(func=run_student)
 
     args = parser.parse_args()
