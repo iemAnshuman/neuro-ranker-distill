@@ -3,18 +3,14 @@ import uvicorn
 import sys
 import os
 
-# --- THE FIX IS HERE ---
-# Get the absolute path to the directory containing manage.py
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Add this directory to Python's search path
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
-# -----------------------
+# --- START OF MODIFICATION ---
+# The sys.path hack is no longer needed and has been removed.
+# --- END OF MODIFICATION ---
 
 
 def run_server(args):
     """Starts the FastAPI development server."""
-    print(f"🚀 Starting NeuroRank API on {args.host}:{args.port}...")
+    print(f"噫 Starting NeuroRank API on {args.host}:{args.port}...")
     # We use the string format for uvicorn so it can reload properly
     uvicorn.run(
         "ranker_service.main:app", host=args.host, port=args.port, reload=args.reload
@@ -26,7 +22,7 @@ def run_teacher(args):
     # Import here to avoid issues if dependencies aren't installed just for running help
     from training_pipeline import train_teacher
 
-    print("👨‍🏫 Starting Teacher (BERT) training...")
+    print("捉窶昨沛ｫ Starting Teacher (BERT) training...")
     train_teacher.main()
 
 
@@ -34,7 +30,7 @@ def run_student(args):
     """Runs the student distillation pipeline."""
     from training_pipeline import distill_student
 
-    print("🎓 Starting Student (MiniLM) distillation...")
+    print("雌 Starting Student (MiniLM) distillation...")
     distill_student.main()
 
 
@@ -63,11 +59,15 @@ def main():
     )
     student_parser.set_defaults(func=run_student)
 
+    # --- MODIFICATION: Fix for when no command is given ---
     args = parser.parse_args()
-    if hasattr(args, "func"):
-        args.func(args)
-    else:
+    if not hasattr(args, "func"):
+        # If no command was given, print help and exit
         parser.print_help()
+        sys.exit(1)
+        
+    args.func(args)
+    # --- END OF MODIFICATION ---
 
 
 if __name__ == "__main__":

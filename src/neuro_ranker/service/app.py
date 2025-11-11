@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException  # <-- ADDED HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
@@ -42,6 +42,16 @@ def rerank(req: RerankRequest):
 
     # Optional freshness boost (additive)
     if req.use_freshness and req.freshness_timestamps:
+        # --- START OF BUG FIX ---
+        # VALIDATE that the lengths of timestamps and texts match
+        if len(req.freshness_timestamps) != len(req.texts):
+            raise HTTPException(
+                status_code=400,  # 400 Bad Request
+                detail=f"Length of freshness_timestamps ({len(req.freshness_timestamps)}) "
+                       f"must match length of texts ({len(req.texts)})."
+            )
+        # --- END OF BUG FIX ---
+
         boost = np.array(freshness_boost(req.freshness_timestamps))
         sims = sims + 0.1 * boost  # small prior
 

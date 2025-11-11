@@ -1,4 +1,5 @@
 import argparse
+import os  # <-- ADDED
 from src.neuro_ranker.trainer_teacher import TeacherTrainer, Pair
 from src.neuro_ranker.datasets import MSMini
 from src.neuro_ranker.utils import set_seed
@@ -15,6 +16,20 @@ def main():
     p.add_argument("--max_len", type=int, default=256)
     p.add_argument("--out_dir", required=True)
     args = p.parse_args()
+
+    # --- START OF MODIFICATION ---
+    # Check if a best model already exists
+    best_model_path = os.path.join(args.out_dir, "best.pt")
+    if os.path.exists(best_model_path):
+        print(f"Found existing trained model: {best_model_path}")
+        response = input("Do you want to retrain? (This will overwrite the existing model) [y/N]: ")
+        if response.lower() != 'y':
+            print("Skipping training. Exiting.")
+            return  # Exit the main function
+        else:
+            print("Proceeding with retraining...")
+    # --- END OF MODIFICATION ---
+
     set_seed(42)
 
     print("Loading MSMini dataset...")
