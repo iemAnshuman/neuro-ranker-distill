@@ -1,5 +1,5 @@
-import argparse, time
-from tqdm import tqdm  # <-- MODIFICATION 1: Added this import
+import argparse, time, os  # <-- MODIFICATION 1: Added 'os'
+from tqdm import tqdm  # <-- MODIFICATION 2: Added 'tqdm'
 from src.neuro_ranker.datasets import MSMini
 from src.neuro_ranker.metrics import ndcg_at_k, mrr_at_k, recall_at_k
 from src.neuro_ranker.bm25 import BM25
@@ -48,7 +48,7 @@ mrrs_t = []
 ndcgs_s = []
 mrrs_s = []
 
-# --- MODIFICATION 2: Wrapped mini.qs with tqdm ---
+# --- MODIFICATION 3: Wrapped mini.qs with tqdm ---
 for qid, qtext in tqdm(mini.qs, desc="Evaluating Rankers"):
     hits = bm25.topk(qtext, args.cand_k)
     labels = [1 if (qid, pid) in mini.qrels else 0 for pid, _, _ in hits]
@@ -114,12 +114,52 @@ for qid, qtext in tqdm(mini.qs, desc="Evaluating Rankers"):
     ndcgs_s.append(ndcg_at_k([lab[i] for i in by_s], args.k))
     mrrs_s.append(mrr_at_k([lab[i] for i in by_s], args.k))
 
+# --- MODIFICATION 4: Calculate, Print, and Save Report ---
+
+# Calculate average metrics
+avg_ndcg_b = sum(ndcgs_b) / len(ndcgs_b)
+avg_mrr_b = sum(mrrs_b) / len(mrrs_b)
+
+avg_ndcg_t = sum(ndcgs_t) / len(ndcgs_t)
+avg_mrr_t = sum(mrrs_t) / len(mrrs_t)
+
+avg_ndcg_s = sum(ndcgs_s) / len(ndcgs_s)
+avg_mrr_s = sum(mrrs_s) / len(mrrs_s)
+
+# Define output path (using absolute path for safety)
+output_dir = "/content/drive/MyDrive/ms_marco_project/"
+report_path = os.path.join(output_dir, "report.md")
+
+# Ensure the directory exists
+os.makedirs(output_dir, exist_ok=True)
+
+# Create markdown content
+report_content = f"""# Evaluation Report
+
+Evaluation metrics calculated at k={args.k}.
+
+| Model | NDCG@{args.k} | MRR@{args.k} |
+| :--- | :--- | :--- |
+| **BM25** | {avg_ndcg_b:.3f} | {avg_mrr_b:.3f} |
+| **Teacher (Cross-Encoder)** | {avg_ndcg_t:.3f} | {avg_mrr_t:.3f} |
+| **Student (Bi-Encoder)** | {avg_ndcg_s:.3f} | {avg_mrr_s:.3f} |
+"""
+
+# Write the report
+try:
+    with open(report_path, "w") as f:
+        f.write(report_content)
+    print(f"\nSuccessfully saved evaluation report to: {report_path}")
+except Exception as e:
+    print(f"\nFailed to save report: {e}")
+
+# Also print to console
 print(
-    f"BM25: NDCG@{args.k}={sum(ndcgs_b)/len(ndcgs_b):.3f} MRR@{args.k}={sum(mrrs_b)/len(mrrs_b):.3f}"
+    f"BM25: NDCG@{args.k}={avg_ndcg_b:.3f} MRR@{args.k}={avg_mrr_b:.3f}"
 )
 print(
-    f"Teach: NDCG@{args.k}={sum(ndcgs_t)/len(ndcgs_t):.3f} MRR@{args.k}={sum(mrrs_t)/len(mrrs_t):.3f}"
+    f"Teach: NDCG@{args.k}={avg_ndcg_t:.3f} MRR@{args.k}={avg_mrr_t:.3f}"
 )
 print(
-    f"Stud.: NDCG@{args.k}={sum(ndcgs_s)/len(ndcgs_s):.3f} MRR@{args.k}={sum(mrrs_s)/len(mrrs_s):.3f}"
+    f"Stud.: NDCG@{args.k}={avg_ndcg_s:.3f} MRR@{args.k}={avg_mrr_s:.3f}"
 )
