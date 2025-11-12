@@ -1,4 +1,5 @@
 import argparse, torch, os
+import train_teacher  # <-- ADDED
 from src.neuro_ranker.datasets import MSMini
 from src.neuro_ranker.trainer_student import StudentTrainer, QP
 from src.neuro_ranker.utils import set_seed
@@ -56,28 +57,40 @@ class DistillDS(Dataset):
 
 def run_distillation(args):
     """Main distillation function, called by manage.py"""
-    best_model_path = os.path.join(args.out_dir, "best.pt")
-    if os.path.exists(best_model_path):
-        print(f"Found existing trained model: {best_model_path}")
-        response = input("Do you want to retrain? (This will overwrite the existing model) [y/N]: ")
-        if response.lower() != 'y':
-            print("Skipping training. Exiting.")
-            return
+    
+    # --- START OF MODIFICATION 1 ---
+    # Check for the TEACHER model
+    if not os.path.exists(args.teacher):
+        print(f"Teacher model not found at: {args.teacher}")
+        response = input("Do you want to train the teacher model now? [y/N]: ")
+        
+        if response.lower() == 'y':
+            print("--- Starting Teacher Training ---")
+            # Create a simple args object for the teacher trainer
+            # using the defaults from manage.py
+            teacher_args = argparse.Namespace(
+                data_dir=args.data_dir,
+                out_dir=os.path.dirname(args.teacher), # e.g., .../models/teacher
+                model="microsoft/MiniLM-L12-H384-uncased",
+                epochs=1,
+                lr=2e-5,
+                batch=16,
+                max_len=256
+            )
+            train_teacher.run_training(teacher_args)
+            print("--- Teacher Training Finished ---")
         else:
-            print("Proceeding with retraining...")
-            
-    # Ensure the output directory exists
-    os.makedirs(args.out_dir, exist_ok=True)
+            print("Cannot proceed with student training without a teacher model. Exiting.")
+            return
+    # --- END OF MODIFICATION 1 ---
 
+    # Ensure the student output directory exists
+    os.makedirs(args.out_dir, exist_ok=True)
     set_seed(42)
 
     # Load teacher model
     print(f"Loading teacher model from: {args.teacher}...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    if not os.path.exists(args.teacher):
-        print(f"Error: Teacher model not found at {args.teacher}")
-        print("Please train the teacher model first or correct the --teacher path.")
-        return
         
     ckpt = torch.load(args.teacher, map_location=device)
     teacher_name = ckpt.get("name", "microsoft/MiniLM-L12-H384-uncased")
@@ -93,6 +106,12 @@ def run_distillation(args):
     distill_dataset = DistillDS(mini, T, T_tok, args.max_len)
 
     trainer = StudentTrainer(args.student, args.lr, args.max_len, temperature=args.temp)
+    
+    # --- START OF MODIFICATION 2 ---
+    # Removed the check for student 'best.pt' here.
+    # That logic is now inside trainer.fit()
+    # --- END OF MODIFICATION 2 ---
+    
     best = trainer.fit(
         distill_dataset, args.out_dir, epochs=args.epochs, batch=args.batch
     )
@@ -118,13 +137,11 @@ if __name__ == "__main__":
     p.add_argument("--batch", type=int, default=64)
     p.add_argument("--max_len", type=int, default=256)
     p.add_argument("--temp", type=float, default=3.0)
-    # --- START OF MODIFICATION ---
     p.add_argument(
         "--out_dir", 
         default="/content/drive/MyDrive/ms_marco_project/models/student",
         help="Output directory for student model"
     )
-    # --- END OF MODIFICATION ---
     args = p.parse_args()
     
     run_distillation(args)

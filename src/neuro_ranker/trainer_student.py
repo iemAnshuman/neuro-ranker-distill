@@ -34,7 +34,6 @@ class BiEncoder(torch.nn.Module):
         q_vec = self.encode(q_input_ids, q_attn)
         p_vec = self.encode(p_input_ids, p_attn)
 
-        # Normalize for cosine similarity, which is standard for sentence-transformers
         q_vec = torch.nn.functional.normalize(q_vec, p=2, dim=1)
         p_vec = torch.nn.functional.normalize(p_vec, p=2, dim=1)
 
@@ -68,7 +67,6 @@ class QPDS(Dataset):
             truncation=True,
             return_tensors="pt",
         )
-        # This part now needs to handle the output from our new on-the-fly DistillDS
         if isinstance(item, QP):
             return {
                 "q_input_ids": q_enc["input_ids"].squeeze(0),
@@ -77,7 +75,6 @@ class QPDS(Dataset):
                 "p_attn": p_enc["attention_mask"].squeeze(0),
                 "tlogit": torch.tensor(item.label, dtype=torch.float),
             }
-        # This handles the case where the dataset itself returns a dictionary
         return item
 
 
@@ -104,23 +101,27 @@ class StudentTrainer:
         save_every: int = 1000,
     ):
         os.makedirs(out_dir, exist_ok=True)
-        # The 'items' is now the dataset itself, so we don't need to wrap it in QPDS
         ds = items
-
-        # --- FIX ---
-        # Changed num_workers from 2 to 0 to prevent CUDA errors in forked processes.
-        # This forces data loading to happen in the main process.
-        dl = DataLoader(ds, batch_size=batch, shuffle=True, num_workers=0)
-        # --- END FIX ---
-
+        dl = DataLoader(ds, batch_size=batch, shuffle=True, num_workers=0) 
         opt = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
 
         start_epoch = 0
         global_step = 0
         best_loss = 1e9
-        path = None
-
-        # --- RESUME LOGIC ---
+        
+        # --- START OF MODIFICATION ---
+        # 1. Check for a FINAL (best.pt) model first.
+        best_path = os.path.join(out_dir, "best.pt")
+        if os.path.exists(best_path):
+            print(f"Found existing trained student model: {best_path}")
+            response = input("Do you want to retrain? [y/N]: ")
+            if response.lower() != 'y':
+                print("Skipping training.")
+                return best_path # Return the path to the existing model
+            else:
+                print("Proceeding with retraining...")
+        
+        # 2. If no final model (or retraining), check for a checkpoint to RESUME from.
         ckpt_path = os.path.join(out_dir, "latest_checkpoint.pt")
         if os.path.exists(ckpt_path):
             print(f"Resuming student training from checkpoint: {ckpt_path}")
@@ -131,12 +132,11 @@ class StudentTrainer:
             global_step = checkpoint["global_step"]
             best_loss = checkpoint.get("best_loss", 1e9)
             print(f"Resuming from Epoch {start_epoch}, Step {global_step}")
-        # --------------------
+        # --- END OF MODIFICATION ---
 
         self.model.train()
         for ep in range(start_epoch, epochs):
             run = 0.0
-            # Correctly handle progress bar for resumed epochs
             prog_bar = tqdm(
                 dl,
                 desc=f"student ep{ep+1}",
@@ -144,15 +144,10 @@ class StudentTrainer:
                 total=len(dl),
             )
             for i, batch_x in enumerate(prog_bar):
-                # Skip steps already completed in a resumed epoch
                 if global_step > 0 and i < (global_step % len(dl)):
                     continue
 
                 if torch.cuda.is_available():
-                    # The QPDS class already returns tensors, but the new on-the-fly loader might not.
-                    # Let's ensure everything is on the correct device.
-                    # Note: The new DistillDS in distill_student.py now handles the raw data,
-                    # so this trainer needs to tokenize it. We'll adjust QPDS to handle both.
                     q_enc = self.qtok(
                         batch_x["query"],
                         max_length=self.max_len,
@@ -174,6 +169,7 @@ class StudentTrainer:
                     p_attn = p_enc["attention_mask"].to(self.model.encoder.device)
                     tlogit = batch_x["label"].to(self.model.encoder.device)
                 else:
+                    # This branch seems unlikely if cuda is available, but keeping for completeness
                     q_input_ids, q_attn = batch_x["q_input_ids"], batch_x["q_attn"]
                     p_input_ids, p_attn = batch_x["p_input_ids"], batch_x["p_attn"]
                     tlogit = batch_x["tlogit"]
@@ -190,7 +186,6 @@ class StudentTrainer:
                 run += float(loss.item())
                 global_step += 1
 
-                # --- PERIODIC CHECKPOINTING ---
                 if global_step % save_every == 0:
                     torch.save(
                         {
@@ -201,15 +196,14 @@ class StudentTrainer:
                             "loss": loss.item(),
                             "best_loss": best_loss,
                         },
-                        ckpt_path,
+                        ckpt_path, # This correctly saves to .../student/latest_checkpoint.pt
                     )
-                # ------------------------------
 
             avg = run / max(1, len(dl))
             print(f"Epoch {ep+1} avg loss: {avg:.4f}")
             if avg < best_loss:
                 best_loss = avg
-                path = os.path.join(out_dir, "best.pt")
-                torch.save({"model": self.model.state_dict()}, path)
+                # This correctly saves the final model to .../student/best.pt
+                torch.save({"model": self.model.state_dict()}, best_path) 
 
-        return path if path and os.path.exists(path) else "No model saved."
+        return best_path if os.path.exists(best_path) else "No model saved."
