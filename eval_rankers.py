@@ -1,4 +1,5 @@
 import argparse, time
+from tqdm import tqdm  # <-- MODIFICATION 1: Added this import
 from src.neuro_ranker.datasets import MSMini
 from src.neuro_ranker.metrics import ndcg_at_k, mrr_at_k, recall_at_k
 from src.neuro_ranker.bm25 import BM25
@@ -47,7 +48,8 @@ mrrs_t = []
 ndcgs_s = []
 mrrs_s = []
 
-for qid, qtext in mini.qs:
+# --- MODIFICATION 2: Wrapped mini.qs with tqdm ---
+for qid, qtext in tqdm(mini.qs, desc="Evaluating Rankers"):
     hits = bm25.topk(qtext, args.cand_k)
     labels = [1 if (qid, pid) in mini.qrels else 0 for pid, _, _ in hits]
 
