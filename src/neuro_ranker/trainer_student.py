@@ -109,20 +109,12 @@ class StudentTrainer:
         global_step = 0
         best_loss = 1e9
         
-        # --- START OF MODIFICATION ---
-        # 1. Check for a FINAL (best.pt) model first.
-        best_path = os.path.join(out_dir, "best.pt")
-        if os.path.exists(best_path):
-            print(f"Found existing trained student model: {best_path}")
-            response = input("Do you want to retrain? [y/N]: ")
-            if response.lower() != 'y':
-                print("Skipping training.")
-                return best_path # Return the path to the existing model
-            else:
-                print("Proceeding with retraining...")
+        # --- START OF CORRECTED MODIFICATION ---
         
-        # 2. If no final model (or retraining), check for a checkpoint to RESUME from.
+        best_path = os.path.join(out_dir, "best.pt")
         ckpt_path = os.path.join(out_dir, "latest_checkpoint.pt")
+
+        # 1. ALWAYS prioritize resuming from the in-progress checkpoint first.
         if os.path.exists(ckpt_path):
             print(f"Resuming student training from checkpoint: {ckpt_path}")
             checkpoint = torch.load(ckpt_path)
@@ -132,7 +124,23 @@ class StudentTrainer:
             global_step = checkpoint["global_step"]
             best_loss = checkpoint.get("best_loss", 1e9)
             print(f"Resuming from Epoch {start_epoch}, Step {global_step}")
-        # --- END OF MODIFICATION ---
+        
+        # 2. ONLY if no checkpoint exists, check for a FINAL model.
+        elif os.path.exists(best_path):
+            print(f"Found existing trained student model: {best_path}")
+            response = input("This is a final model. Do you want to retrain (start from scratch)? [y/N]: ")
+            if response.lower() != 'y':
+                print("Skipping training.")
+                return best_path # Return the path to the existing model
+            else:
+                print("Proceeding with retraining from scratch...")
+                # No checkpoint loaded, so start_epoch and global_step remain 0
+        
+        # 3. If neither exists, just start training.
+        else:
+            print("No checkpoint or final model found. Starting training from scratch.")
+
+        # --- END OF CORRECTED MODIFICATION ---
 
         self.model.train()
         for ep in range(start_epoch, epochs):
