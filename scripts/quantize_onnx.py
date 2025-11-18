@@ -1,10 +1,21 @@
 import argparse
+import os
 from onnxruntime.quantization import quantize_dynamic, QuantType
 
-p = argparse.ArgumentParser()
-p.add_argument("--in_onnx", required=True)
-p.add_argument("--out_onnx", required=True)
-args = p.parse_args()
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", required=True, help="Path to input ONNX model")
+    parser.add_argument("--output", required=True, help="Path to output quantized model")
+    args = parser.parse_args()
 
-quantize_dynamic(args.in_onnx, args.out_onnx, weight_type=QuantType.QInt8)
-print("INT8 written to", args.out_onnx)
+    print(f"Quantizing {args.model} -> {args.output} ...")
+    
+    quantize_dynamic(
+        model_input=args.model,
+        model_output=args.output,
+        weight_type=QuantType.QUInt8
+    )
+    print("Quantization complete.")
+
+if __name__ == "__main__":
+    main()
