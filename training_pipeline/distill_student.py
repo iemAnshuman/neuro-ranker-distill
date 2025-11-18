@@ -1,5 +1,11 @@
-import argparse, torch, os
-import train_teacher  # <-- ADDED
+import argparse, torch, os, sys
+
+# Fix: Add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Fix: Correct import for sibling script
+from training_pipeline import train_teacher
+
 from src.neuro_ranker.datasets import MSMini
 from src.neuro_ranker.trainer_student import StudentTrainer, QP
 from src.neuro_ranker.utils import set_seed
@@ -58,19 +64,15 @@ class DistillDS(Dataset):
 def run_distillation(args):
     """Main distillation function, called by manage.py"""
     
-    # --- START OF MODIFICATION 1 ---
-    # Check for the TEACHER model
     if not os.path.exists(args.teacher):
         print(f"Teacher model not found at: {args.teacher}")
         response = input("Do you want to train the teacher model now? [y/N]: ")
         
         if response.lower() == 'y':
             print("--- Starting Teacher Training ---")
-            # Create a simple args object for the teacher trainer
-            # using the defaults from manage.py
             teacher_args = argparse.Namespace(
                 data_dir=args.data_dir,
-                out_dir=os.path.dirname(args.teacher), # e.g., .../models/teacher
+                out_dir=os.path.dirname(args.teacher),
                 model="microsoft/MiniLM-L12-H384-uncased",
                 epochs=1,
                 lr=2e-5,
@@ -82,13 +84,10 @@ def run_distillation(args):
         else:
             print("Cannot proceed with student training without a teacher model. Exiting.")
             return
-    # --- END OF MODIFICATION 1 ---
 
-    # Ensure the student output directory exists
     os.makedirs(args.out_dir, exist_ok=True)
     set_seed(42)
 
-    # Load teacher model
     print(f"Loading teacher model from: {args.teacher}...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
         
@@ -100,17 +99,11 @@ def run_distillation(args):
     T.to(device)
     T.eval()
 
-    # Create the on-the-fly dataset
     print(f"Setting up dataset from: {args.data_dir}...")
     mini = MSMini(args.data_dir)
     distill_dataset = DistillDS(mini, T, T_tok, args.max_len)
 
     trainer = StudentTrainer(args.student, args.lr, args.max_len, temperature=args.temp)
-    
-    # --- START OF MODIFICATION 2 ---
-    # Removed the check for student 'best.pt' here.
-    # That logic is now inside trainer.fit()
-    # --- END OF MODIFICATION 2 ---
     
     best = trainer.fit(
         distill_dataset, args.out_dir, epochs=args.epochs, batch=args.batch
@@ -119,16 +112,16 @@ def run_distillation(args):
 
 
 if __name__ == "__main__":
-    # This block is for running this script directly
     p = argparse.ArgumentParser()
+    # Fix: Relative default paths
     p.add_argument(
         "--data_dir", 
-        default="/content/drive/MyDrive/ms_marco_project", 
+        default="./data", 
         help="Path to the MS MARCO dataset"
     )
     p.add_argument(
         "--teacher", 
-        default="/content/drive/MyDrive/ms_marco_project/models/teacher/best.pt",
+        default="./models/teacher/best.pt",
         help="Path to teacher best.pt"
     )
     p.add_argument("--student", default="sentence-transformers/all-MiniLM-L6-v2")
@@ -139,7 +132,7 @@ if __name__ == "__main__":
     p.add_argument("--temp", type=float, default=3.0)
     p.add_argument(
         "--out_dir", 
-        default="/content/drive/MyDrive/ms_marco_project/models/student",
+        default="./models/student",
         help="Output directory for student model"
     )
     args = p.parse_args()

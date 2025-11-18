@@ -1,5 +1,10 @@
 import argparse
 import os
+import sys
+
+# Fix: Add project root to sys.path to locate 'src'
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from src.neuro_ranker.trainer_teacher import TeacherTrainer, Pair
 from src.neuro_ranker.datasets import MSMini
 from src.neuro_ranker.utils import set_seed
@@ -17,7 +22,6 @@ def run_training(args):
         else:
             print("Proceeding with retraining...")
     
-    # Ensure the output directory exists
     os.makedirs(args.out_dir, exist_ok=True)
 
     set_seed(42)
@@ -43,11 +47,11 @@ def run_training(args):
 
 
 if __name__ == "__main__":
-    # This block is for running this script directly
     p = argparse.ArgumentParser()
+    # Fix: Relative default path
     p.add_argument(
         "--data_dir",
-        default="/content/drive/MyDrive/ms_marco_project",
+        default="./data",
         help="Path to the MS MARCO dataset"
     )
     p.add_argument("--model", default="microsoft/MiniLM-L12-H384-uncased")
@@ -55,13 +59,12 @@ if __name__ == "__main__":
     p.add_argument("--lr", type=float, default=2e-5)
     p.add_argument("--batch", type=int, default=16)
     p.add_argument("--max_len", type=int, default=256)
-    # --- START OF MODIFICATION ---
+    # Fix: Relative default path
     p.add_argument(
         "--out_dir", 
-        default="/content/drive/MyDrive/ms_marco_project/models/teacher",
+        default="./models/teacher",
         help="Output directory for teacher model"
     )
-    # --- END OF MODIFICATION ---
     args = p.parse_args()
     
     run_training(args)
