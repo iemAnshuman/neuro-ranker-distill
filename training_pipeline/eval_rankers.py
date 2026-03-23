@@ -26,11 +26,12 @@ bm25 = BM25(args.bm25_index)
 
 # Load teacher
 ckpt_t = torch.load(args.teacher, map_location="cpu")
+# Defaulting to a standard 110M parameter BERT-base model for the teacher fallback
 T_tok = AutoTokenizer.from_pretrained(
-    ckpt_t.get("name", "microsoft/MiniLM-L12-H384-uncased")
+    ckpt_t.get("name", "cross-encoder/ms-marco-TinyBERT-L-6") # or "cross-encoder/ms-marco-electra-base"
 )
 T = AutoModelForSequenceClassification.from_pretrained(
-    ckpt_t.get("name", "microsoft/MiniLM-L12-H384-uncased"), num_labels=1
+    ckpt_t.get("name", "cross-encoder/ms-marco-TinyBERT-L-6"), num_labels=1 
 )
 T.load_state_dict(ckpt_t["model"])
 T.eval()
