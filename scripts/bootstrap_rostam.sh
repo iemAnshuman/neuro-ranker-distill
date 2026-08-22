@@ -12,7 +12,7 @@ export HF_HOME=${HF_HOME:-"$WORK/.cache/neuro-ranker/huggingface"}
 export TORCH_HOME=${TORCH_HOME:-"$WORK/.cache/neuro-ranker/torch"}
 export PIP_CACHE_DIR=${PIP_CACHE_DIR:-"$WORK/.cache/neuro-ranker/pip"}
 
-module reset
+module purge
 module load python/3.12.3
 mkdir -p "$(dirname "$venv_path")" "$HF_HOME" "$TORCH_HOME" "$PIP_CACHE_DIR"
 

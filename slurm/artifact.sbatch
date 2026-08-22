@@ -14,7 +14,7 @@ if [[ "${MSMARCO_TERMS_ACCEPTED:-0}" != "1" ]]; then
     exit 2
 fi
 
-module reset
+module purge
 module load python/3.12.3
 repo_root=${SLURM_SUBMIT_DIR:?submit from the repository root}
 venv_path=${NEURORANKER_VENV:-"$WORK/venvs/neuro-ranker-0.2"}

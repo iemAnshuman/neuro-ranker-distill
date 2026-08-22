@@ -9,7 +9,7 @@
 #SBATCH --output=slurm-%x-%j.out
 
 set -euo pipefail
-module reset
+module purge
 module load python/3.12.3
 
 repo_root=${SLURM_SUBMIT_DIR:?submit from the repository root}
