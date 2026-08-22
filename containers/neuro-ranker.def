@@ -7,7 +7,13 @@ From: nvidia/cuda@sha256:ac55d124da4882b497f732d8dfd9a702d5447a5f29d08d56da6f64f
     org.opencontainers.image.source https://github.com/iemAnshuman/neuro-ranker-distill
 
 %files
-    . /opt/neuro-ranker
+    pyproject.toml /opt/neuro-ranker/
+    requirements-runtime.lock /opt/neuro-ranker/
+    README.md /opt/neuro-ranker/
+    LICENSE /opt/neuro-ranker/
+    src /opt/neuro-ranker/
+    ranker_service /opt/neuro-ranker/
+    configs /opt/neuro-ranker/
 
 %post
     export DEBIAN_FRONTEND=noninteractive
