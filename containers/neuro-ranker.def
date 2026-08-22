@@ -1,0 +1,33 @@
+Bootstrap: docker
+From: nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+
+%labels
+    org.opencontainers.image.title NeuroRanker Distill
+    org.opencontainers.image.version 0.2.0
+    org.opencontainers.image.source https://github.com/iemAnshuman/neuro-ranker-distill
+
+%files
+    . /opt/neuro-ranker
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends python3 python3-pip python3-venv
+    rm -rf /var/lib/apt/lists/*
+    python3 -m pip install --break-system-packages --require-hashes \
+        -r /opt/neuro-ranker/requirements-runtime.lock
+    python3 -m pip install --break-system-packages --no-deps /opt/neuro-ranker
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export TOKENIZERS_PARALLELISM=false
+
+%runscript
+    exec neuro-ranker "$@"
+
+%test
+    work_dir=$(mktemp -d)
+    neuro-ranker prepare --config /opt/neuro-ranker/configs/fixture.json \
+        --output "$work_dir/fixture"
+    neuro-ranker verify-data --data-dir "$work_dir/fixture"
+

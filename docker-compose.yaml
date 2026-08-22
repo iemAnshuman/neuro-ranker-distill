@@ -1,11 +1,11 @@
-version: '3.8'
 services:
-  neurorank-api:
+  neuroranker:
     build: .
     ports:
       - "8000:8000"
     volumes:
-      # Mount the models directory so you don't have to rebuild the image to change models
-      - ./models:/app/models
+      - ./runs/release/export:/models:ro
     environment:
-      - MODEL_PATH=/app/models/quantized_student.onnx
+      NEURORANKER_ONNX: /models/student.int8.onnx
+      NEURORANKER_TOKENIZER: /models
+
