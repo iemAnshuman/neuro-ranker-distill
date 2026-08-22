@@ -14,20 +14,22 @@ From: nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
     apt-get update
     apt-get install -y --no-install-recommends python3 python3-pip python3-venv
     rm -rf /var/lib/apt/lists/*
-    python3 -m pip install --break-system-packages --require-hashes \
+    python3 -m venv /opt/venv
+    /opt/venv/bin/python -m pip install --require-hashes \
         -r /opt/neuro-ranker/requirements-runtime.lock
-    python3 -m pip install --break-system-packages --no-build-isolation \
+    /opt/venv/bin/python -m pip install --no-build-isolation \
         --no-deps /opt/neuro-ranker
 
 %environment
+    export PATH=/opt/venv/bin:$PATH
     export PYTHONUNBUFFERED=1
     export TOKENIZERS_PARALLELISM=false
 
 %runscript
-    exec neuro-ranker "$@"
+    exec /opt/venv/bin/neuro-ranker "$@"
 
 %test
     work_dir=$(mktemp -d)
-    neuro-ranker prepare --config /opt/neuro-ranker/configs/fixture.json \
+    /opt/venv/bin/neuro-ranker prepare --config /opt/neuro-ranker/configs/fixture.json \
         --output "$work_dir/fixture"
-    neuro-ranker verify-data --data-dir "$work_dir/fixture"
+    /opt/venv/bin/neuro-ranker verify-data --data-dir "$work_dir/fixture"
