@@ -1,3 +1,10 @@
+import re
+
+
 def filter_banned(texts: list[str], banned_terms: list[str]) -> list[bool]:
-    normalized_terms = [term.lower() for term in banned_terms]
-    return [any(term in text.lower() for term in normalized_terms) for text in texts]
+    patterns = [
+        re.compile(rf"(?<!\w){re.escape(term.strip())}(?!\w)", re.IGNORECASE)
+        for term in banned_terms
+        if term.strip()
+    ]
+    return [any(pattern.search(text) for pattern in patterns) for text in texts]

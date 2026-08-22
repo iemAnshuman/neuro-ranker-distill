@@ -71,12 +71,13 @@ def create_app(encoder: Encoder | None = None) -> FastAPI:
             scores = scores + 0.1 * np.asarray(
                 freshness_boost(request.freshness_timestamps), dtype=np.float32
             )
+        eligible = np.arange(len(request.texts))
         if request.banned_terms:
-            scores = scores - np.asarray(
-                filter_banned(request.texts, request.banned_terms), dtype=np.float32
-            )
-        top_k = min(request.top_k, len(request.texts))
-        order = np.argsort(-scores, kind="stable")[:top_k]
+            banned = np.asarray(filter_banned(request.texts, request.banned_terms), dtype=bool)
+            eligible = eligible[~banned]
+        top_k = min(request.top_k, len(eligible))
+        eligible_order = np.argsort(-scores[eligible], kind="stable")[:top_k]
+        order = eligible[eligible_order]
         elapsed_ms = (time.perf_counter() - started) * 1000
         return RerankResponse(
             indices=order.tolist(),

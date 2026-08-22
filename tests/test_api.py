@@ -44,3 +44,33 @@ def test_timestamp_length_is_validated():
             },
         )
         assert response.status_code == 400
+
+
+def test_banned_passages_are_excluded_instead_of_penalized():
+    with TestClient(create_app(FakeEncoder())) as client:
+        response = client.post(
+            "/rerank",
+            json={
+                "query": "query",
+                "texts": ["relevant", "irrelevant"],
+                "banned_terms": ["relevant"],
+                "top_k": 2,
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["indices"] == [1]
+
+
+def test_all_banned_passages_return_an_empty_ranking():
+    with TestClient(create_app(FakeEncoder())) as client:
+        response = client.post(
+            "/rerank",
+            json={
+                "query": "query",
+                "texts": ["relevant"],
+                "banned_terms": ["relevant"],
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["indices"] == []
+        assert response.json()["scores"] == []
