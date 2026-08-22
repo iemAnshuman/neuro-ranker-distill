@@ -1,9 +1,3 @@
-from typing import List
-
-
-def filter_banned(texts: List[str], banned_terms: List[str]) -> List[bool]:
-    flags = []
-    for t in texts:
-        low = t.lower()
-        flags.append(any(b in low for b in banned_terms))
-    return flags
+def filter_banned(texts: list[str], banned_terms: list[str]) -> list[bool]:
+    normalized_terms = [term.lower() for term in banned_terms]
+    return [any(term in text.lower() for term in normalized_terms) for text in texts]

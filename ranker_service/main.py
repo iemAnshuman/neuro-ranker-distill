@@ -1,1 +1,3 @@
-from src.neuro_ranker.service.app import app  # for uvicorn discoverability
+from neuro_ranker.service.app import create_app
+
+app = create_app()

@@ -1,20 +1,16 @@
-import math, time
-from typing import List, Optional
+from __future__ import annotations
 
-# Exponential decay prior: newer = higher
+import time
 
 
 def freshness_boost(
-    timestamps: List[Optional[int]], now: Optional[int] = None, half_life_days: int = 14
-):
-    now = now or int(time.time())
-    out = []
-    hl = half_life_days * 86400
-    for ts in timestamps:
-        if ts is None:
-            out.append(0.0)
-        else:
-            dt = max(0, now - ts)
-            boost = 2 ** (-(dt / hl))  # 1.0 when ts=now, 0.5 at half‑life
-            out.append(boost)
-    return out
+    timestamps: list[int | None],
+    now: int | None = None,
+    half_life_days: int = 14,
+) -> list[float]:
+    reference = int(time.time()) if now is None else now
+    half_life_seconds = half_life_days * 86400
+    return [
+        0.0 if timestamp is None else 2 ** (-(max(0, reference - timestamp) / half_life_seconds))
+        for timestamp in timestamps
+    ]

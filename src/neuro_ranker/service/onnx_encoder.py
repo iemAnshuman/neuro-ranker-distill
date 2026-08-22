@@ -1,26 +1,38 @@
-import onnxruntime as ort
+from __future__ import annotations
+
+from collections.abc import Sequence
+from pathlib import Path
+
 import numpy as np
-from transformers import AutoTokenizer
 
 
 class OnnxEncoder:
-    def __init__(self, onnx_path: str, model_name: str):
-        self.sess = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
-        self.tok = AutoTokenizer.from_pretrained(model_name)
+    def __init__(
+        self,
+        onnx_path: str | Path,
+        tokenizer_path: str | Path,
+        *,
+        max_length: int = 256,
+    ):
+        import onnxruntime as ort
+        from transformers import AutoTokenizer
 
-    def embed(self, texts, max_len=256):
-        enc = self.tok(
-            texts,
+        self.session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+        self.tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_path), use_fast=True)
+        self.max_length = max_length
+
+    def embed(self, texts: Sequence[str]) -> np.ndarray:
+        encoded = self.tokenizer(
+            list(texts),
             padding=True,
             truncation=True,
-            max_length=max_len,
+            max_length=self.max_length,
             return_tensors="np",
         )
-        outs = self.sess.run(
+        return self.session.run(
             None,
-            {"input_ids": enc["input_ids"], "attention_mask": enc["attention_mask"]},
-        )
-        last = outs[0]  # [B, L, H]
-        attn = enc["attention_mask"][:, :, None]
-        vec = (last * attn).sum(axis=1) / np.clip(attn.sum(axis=1), 1e-6, None)
-        return vec.astype(np.float32)
+            {
+                "input_ids": encoded["input_ids"].astype(np.int64),
+                "attention_mask": encoded["attention_mask"].astype(np.int64),
+            },
+        )[0].astype(np.float32)
