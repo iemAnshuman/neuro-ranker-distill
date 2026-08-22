@@ -86,8 +86,8 @@ def collect_provenance(repo_root: str | Path) -> dict[str, Any]:
             "remote": _run(["git", "remote", "get-url", "origin"], root),
         },
         "locks": {
-            "uv.lock": _sha256_optional(root / "uv.lock"),
             "requirements-ci.lock": _sha256_optional(root / "requirements-ci.lock"),
+            "requirements-runtime.lock": _sha256_optional(root / "requirements-runtime.lock"),
         },
         "gpu": _run(
             [
@@ -100,7 +100,10 @@ def collect_provenance(repo_root: str | Path) -> dict[str, Any]:
         "environment": {
             "LOADEDMODULES": os.environ.get("LOADEDMODULES", ""),
             "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
+            "CUBLAS_WORKSPACE_CONFIG": os.environ.get("CUBLAS_WORKSPACE_CONFIG", ""),
             "HF_HOME": os.environ.get("HF_HOME", ""),
+            "PYTHONHASHSEED": os.environ.get("PYTHONHASHSEED", ""),
+            "TOKENIZERS_PARALLELISM": os.environ.get("TOKENIZERS_PARALLELISM", ""),
             "TRANSFORMERS_CACHE": os.environ.get("TRANSFORMERS_CACHE", ""),
         },
     }
