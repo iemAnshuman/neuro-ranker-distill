@@ -12,7 +12,11 @@ from transformers import AutoModel, AutoTokenizer
 class BiEncoder(torch.nn.Module):
     def __init__(self, model_name_or_path: str, revision: str | None = None):
         super().__init__()
-        self.encoder = AutoModel.from_pretrained(model_name_or_path, revision=revision)
+        self.encoder = AutoModel.from_pretrained(
+            model_name_or_path,
+            revision=revision,
+            attn_implementation="eager",
+        )
 
     @staticmethod
     def pool(last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:

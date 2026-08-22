@@ -18,6 +18,7 @@ run_dir="$WORK/neuro-ranker-runs/fixture-$SLURM_JOB_ID"
 export HF_HOME=${HF_HOME:-"$WORK/.cache/neuro-ranker/huggingface"}
 export TORCH_HOME=${TORCH_HOME:-"$WORK/.cache/neuro-ranker/torch"}
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
+export PYTHONHASHSEED=42
 export TOKENIZERS_PARALLELISM=false
 
 source "$venv_path/bin/activate"

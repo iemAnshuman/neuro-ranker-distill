@@ -40,9 +40,11 @@ def score_teacher_file(
     set_seed(seed)
     torch_device = _resolve_device(device)
     tokenizer = AutoTokenizer.from_pretrained(model_name, revision=revision, use_fast=True)
-    model = AutoModelForSequenceClassification.from_pretrained(model_name, revision=revision).to(
-        torch_device
-    )
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_name,
+        revision=revision,
+        attn_implementation="eager",
+    ).to(torch_device)
     model.eval()
 
     total = count_lines(source)
