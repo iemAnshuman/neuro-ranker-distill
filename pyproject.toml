@@ -1,44 +1,59 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "neuro-ranker-distill"
-version = "0.1.0"
+version = "0.2.0"
+description = "Reproducible cross-encoder to bi-encoder distillation on MS MARCO"
 readme = "README.md"
-requires-python = ">=3.10"
-
-# --- START OF MODIFICATION ---
-# Dependencies are now listed here, replacing requirements.txt
+requires-python = ">=3.10,<3.14"
+license = {file = "LICENSE"}
+authors = [{name = "Anshuman Agrawal"}]
 dependencies = [
-    "torch>=2.2",
-    "transformers>=4.41",
-    "datasets>=2.20",
-    "sentence-transformers>=3.0",
-    "pyserini>=0.24.0",
-    "faiss-cpu>=1.8.0",
-    "scikit-learn>=1.5",
-    "numpy>=1.26",
-    "pandas>=2.2",
-    "pyyaml>=6.0.1",
-    "tqdm>=4.66",
-    # Service & ONNX
-    "fastapi>=0.111",
-    "uvicorn>=0.30",
-    "onnx>=1.16",
-    "onnxruntime==1.22.1",
-    # Testing & misc
-    "httpx>=0.27"
+    "numpy>=1.26,<3",
 ]
 
-# This section creates the new 'neurorank' command
+[project.optional-dependencies]
+train = [
+    "torch>=2.7,<2.8",
+    "transformers>=4.48,<5",
+    "tqdm>=4.66,<5",
+]
+export = [
+    "onnx>=1.17,<2",
+    "onnxruntime>=1.20,<2",
+]
+service = [
+    "fastapi>=0.115,<1",
+    "onnxruntime>=1.20,<2",
+    "transformers>=4.48,<5",
+    "uvicorn>=0.34,<1",
+]
+test = [
+    "httpx>=0.27,<1",
+    "pytest>=8.3,<9",
+]
+dev = [
+    "ruff>=0.11,<1",
+]
+
 [project.scripts]
-neurorank = "manage:main"
+neuro-ranker = "neuro_ranker.cli:main"
 
-# This section tells setuptools how to find your packages
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
-# Look for packages in the 'src' directory (finds 'neuro_ranker')
-# and in the root directory (finds 'ranker_service' and 'training_pipeline')
-where = ["src", "."]
-include = ["neuro_ranker*", "ranker_service*", "training_pipeline*"]
-# --- END OF MODIFICATION ---
+where = ["src"]
 
-[tool.pyright]
-venvPath = "."
-venv = ".venv"
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
