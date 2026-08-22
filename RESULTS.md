@@ -22,6 +22,14 @@ INT8 achieved minimum embedding cosine `0.99143` over the validation corpus and
 reduced the ONNX file size by `23.34%`. These values validate the artifact
 machinery only; the tiny synthetic ranking metrics are not research results.
 
+### Portable image validation
+
+An Apptainer image built from commit
+`76a8f0d58b0d544220d4eb96ccf60cbbd06c163a` passed its embedded fixture test
+and a CUDA tensor operation on a Rostam A100 with PyTorch `2.7.1+cu128`. The
+finished SIF is `10,825,363,456` bytes with SHA-256
+`83d2a9f0cfea97cc60fcd3729d676c21cc8375b4cdaef206f2e54aeabb43b4bd`.
+
 The previous README's accuracy, model-size, speedup, and latency numbers were not
 connected to a reproducible run manifest, so they are intentionally not carried
 forward. This file will be updated from a completed Rostam artifact run with:
