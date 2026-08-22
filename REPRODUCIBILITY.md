@@ -47,8 +47,8 @@ requires regenerating and reviewing the lock.
 
 ## Container
 
-The Apptainer definition uses a pinned CUDA runtime tag and the hashed runtime
-lock:
+The Apptainer definition uses the immutable manifest-list digest for the tested
+`nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04` base and the hashed runtime lock:
 
 ```bash
 apptainer build neuro-ranker.sif containers/neuro-ranker.def
