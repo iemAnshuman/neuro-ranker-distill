@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "profile": "artifact",
+  "seed": 42,
+  "data": {
+    "train_records": 100000,
+    "eval_queries": 6980,
+    "candidates_per_query": 1000
+  },
+  "teacher": {
+    "model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+    "revision": "233902d25c440f23af6f7d6e94d2946bac0bee0a",
+    "batch_size": 256,
+    "max_length": 256
+  },
+  "student": {
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "epochs": 1,
+    "batch_size": 64,
+    "learning_rate": 0.00002,
+    "max_length": 256
+  },
+  "evaluation": {
+    "batch_size": 512,
+    "k": 10
+  }
+}
+
