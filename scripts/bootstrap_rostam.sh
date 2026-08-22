@@ -20,10 +20,8 @@ if [[ ! -x "$venv_path/bin/python" ]]; then
     python3 -m venv "$venv_path"
 fi
 
-"$venv_path/bin/python" -m pip install --upgrade pip
 "$venv_path/bin/python" -m pip install --require-hashes \
     -r "$repo_root/requirements-runtime.lock"
-"$venv_path/bin/python" -m pip install --no-deps -e "$repo_root"
+"$venv_path/bin/python" -m pip install --no-build-isolation --no-deps -e "$repo_root"
 
 echo "Environment ready: $venv_path"
-
