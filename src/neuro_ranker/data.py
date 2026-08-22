@@ -14,9 +14,25 @@ from .config import config_digest
 MSMARCO_TERMS_URL = "https://microsoft.github.io/msmarco/"
 MSMARCO_DOWNLOAD_ROOT = "https://msmarco.z22.web.core.windows.net/msmarcoranking"
 MSMARCO_SOURCES = {
-    "train_triples": f"{MSMARCO_DOWNLOAD_ROOT}/triples.train.small.tar.gz",
-    "dev_candidates": f"{MSMARCO_DOWNLOAD_ROOT}/top1000.dev.tar.gz",
-    "dev_qrels": f"{MSMARCO_DOWNLOAD_ROOT}/qrels.dev.tsv",
+    "train_triples": {
+        "url": f"{MSMARCO_DOWNLOAD_ROOT}/triples.train.small.tar.gz",
+        "content_length": "7930881353",
+        "etag": '"0x8DBE166AC95195B"',
+        "last_modified": "Thu, 09 Nov 2023 20:58:50 GMT",
+    },
+    "dev_candidates": {
+        "url": f"{MSMARCO_DOWNLOAD_ROOT}/top1000.dev.tar.gz",
+        "content_length": "687414398",
+        "etag": '"0x8DBE166A92A3437"',
+        "last_modified": "Thu, 09 Nov 2023 20:58:44 GMT",
+    },
+    "dev_qrels": {
+        "url": f"{MSMARCO_DOWNLOAD_ROOT}/qrels.dev.tsv",
+        "content_length": "1201626",
+        "content_md5_base64": "kVfMrqqCJ/kXIrpXcHh7Fg==",
+        "etag": '"0x8DBE166ABFFF421"',
+        "last_modified": "Thu, 09 Nov 2023 20:58:49 GMT",
+    },
 }
 
 
@@ -37,13 +53,30 @@ def count_lines(path: str | Path) -> int:
         return sum(1 for _ in handle)
 
 
-def _request(url: str) -> BinaryIO:
+def _request(source_name: str) -> BinaryIO:
+    source = MSMARCO_SOURCES[source_name]
+    url = source["url"]
     request = urllib.request.Request(url, headers={"User-Agent": "neuro-ranker-distill/0.2"})
-    return urllib.request.urlopen(request, timeout=120)  # noqa: S310
+    response = urllib.request.urlopen(request, timeout=120)  # noqa: S310
+    expected_headers = {
+        "Content-Length": source["content_length"],
+        "ETag": source["etag"],
+        "Last-Modified": source["last_modified"],
+    }
+    if "content_md5_base64" in source:
+        expected_headers["Content-MD5"] = source["content_md5_base64"]
+    for header, expected in expected_headers.items():
+        actual = response.headers.get(header)
+        if actual != expected:
+            response.close()
+            raise RuntimeError(
+                f"upstream {source_name} changed: {header} expected {expected!r}, got {actual!r}"
+            )
+    return response
 
 
-def _iter_tar_lines(url: str) -> Iterator[str]:
-    with _request(url) as response:
+def _iter_tar_lines(source_name: str) -> Iterator[str]:
+    with _request(source_name) as response:
         with tarfile.open(fileobj=response, mode="r|gz") as archive:
             for member in archive:
                 if not member.isfile():
@@ -54,12 +87,12 @@ def _iter_tar_lines(url: str) -> Iterator[str]:
                 for raw_line in extracted:
                     yield raw_line.decode("utf-8").rstrip("\n")
                 return
-    raise RuntimeError(f"archive had no regular file: {url}")
+    raise RuntimeError(f"archive had no regular file: {MSMARCO_SOURCES[source_name]['url']}")
 
 
-def _read_qrels(url: str) -> dict[str, dict[str, int]]:
+def _read_qrels(source_name: str) -> dict[str, dict[str, int]]:
     qrels: dict[str, dict[str, int]] = {}
-    with _request(url) as response:
+    with _request(source_name) as response:
         for raw_line in response:
             fields = raw_line.decode("utf-8").strip().split()
             if len(fields) != 4:
@@ -136,7 +169,7 @@ def _fixture_candidates() -> Iterator[dict[str, Any]]:
 
 def _msmarco_triplets(limit: int) -> Iterator[dict[str, Any]]:
     produced = 0
-    for line in _iter_tar_lines(MSMARCO_SOURCES["train_triples"]):
+    for line in _iter_tar_lines("train_triples"):
         fields = line.split("\t", maxsplit=2)
         if len(fields) != 3:
             continue
@@ -148,10 +181,10 @@ def _msmarco_triplets(limit: int) -> Iterator[dict[str, Any]]:
 
 
 def _msmarco_candidates(query_limit: int, candidates_per_query: int) -> Iterator[dict[str, Any]]:
-    qrels = _read_qrels(MSMARCO_SOURCES["dev_qrels"])
+    qrels = _read_qrels("dev_qrels")
     selected: list[str] = []
     per_query: dict[str, int] = {}
-    for line in _iter_tar_lines(MSMARCO_SOURCES["dev_candidates"]):
+    for line in _iter_tar_lines("dev_candidates"):
         fields = line.split("\t", maxsplit=3)
         if len(fields) != 4:
             continue

@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from neuro_ranker import data as data_module
 from neuro_ranker.config import load_config
 from neuro_ranker.data import (
     TermsNotAcceptedError,
@@ -38,3 +39,19 @@ def test_msmarco_requires_explicit_terms_acceptance(tmp_path):
     config = load_config("configs/smoke.json")
     with pytest.raises(TermsNotAcceptedError):
         prepare_dataset(config, tmp_path / "smoke")
+
+
+def test_source_identity_mismatch_closes_response(monkeypatch):
+    class Response:
+        headers = {"Content-Length": "0"}
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    response = Response()
+    monkeypatch.setattr(data_module.urllib.request, "urlopen", lambda *_args, **_kwargs: response)
+
+    with pytest.raises(RuntimeError, match="upstream dev_qrels changed: Content-Length"):
+        data_module._request("dev_qrels")
+    assert response.closed
