@@ -1,87 +1,103 @@
-# NeuroRank: High-Performance Neural Information Retrieval
+# NeuroRanker Distill
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+NeuroRanker is a reproducible teacher-to-student reranking experiment on the
+MS MARCO passage-ranking task. A pinned cross-encoder scores positive/negative
+training triplets. A mean-pooled bi-encoder learns the teacher's score margin,
+then reranks the official candidate set. The same student is exported to FP32
+and dynamically quantized INT8 ONNX, with numerical validation against PyTorch.
 
-**NeuroRank** is a production-ready neural reranking service designed for low-latency Information Retrieval (IR). It leverages **Knowledge Distillation** to compress a large, highly accurate BERT-based "teacher" model into a smaller, faster "student" model. Further performance gains are achieved through **ONNX runtime optimization** and **8-bit quantization**, making it suitable for real-time search applications.
+This repository does not claim a fixed accuracy or speedup. Measured results,
+hardware, dataset profile, candidate depth, software versions, and artifact
+digests belong in [RESULTS.md](RESULTS.md) after a verified run.
 
-## 🚀 Key Features
+## What is reproducible
 
-* **Knowledge Distillation:** Achieves 97% of the teacher model's accuracy with a 6x reduction in model size and 10x faster inference.
-* **Production-Optimized:** Deployed using ONNX Runtime with dynamic quantization for CPU-based inference.
-* **Scalable API:** Includes a FastAPI-based REST service ready for containerization (Docker).
-* **Standard Benchmarks:** Trained and evaluated on the MS MARCO passage ranking dataset.
+- model IDs are pinned to immutable Hugging Face revisions;
+- dataset preparation requires explicit acceptance of Microsoft's MS MARCO
+  terms and writes SHA-256 manifests;
+- `fixture`, `smoke`, and `artifact` profiles have fixed record/query limits;
+- training fixes Python, NumPy, and PyTorch seeds and records its inputs;
+- evaluation reports candidate-set MRR, nDCG, recall, and a TREC-format run;
+- ONNX export fails unless FP32 and INT8 numerical checks pass;
+- Rostam jobs capture Git, Slurm, GPU, module, package, and lock provenance.
 
-## 🛠️ Architecture
+## Quick local check
 
-```mermaid
-graph LR
-    A[MS MARCO Data] --> B(Teacher Model<br/>Cross-Encoder BERT);
-    B -->|Distillation Logs| C{Distillation<br/>Trainer};
-    A --> C;
-    C --> D(Student Model<br/>MiniLM);
-    D --> E[ONNX Export &<br/>Quantization];
-    E --> F(NeuroRank<br/>Service API);
-````
+Python 3.10–3.13 is supported. The fixture profile is synthetic and does not
+download MS MARCO.
 
-## ⚡ Performance Benchmarks
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --require-hashes -r requirements-runtime.lock
+python -m pip install --no-deps -e .
 
-| Model Version | MRR@10 | Latency (p99) | Model Size |
-| :--- | :--- | :--- | :--- |
-| **Teacher (BERT-Base)** | 0.382 | 120ms | 420MB |
-| **Student (MiniLM-L6)** | 0.371 | 15ms | 90MB |
-| **NeuroRank (Quantized ONNX)**| **0.369** | **8ms** | **23MB** |
+neuro-ranker prepare --config configs/fixture.json --output data/fixture
+neuro-ranker verify-data --data-dir data/fixture
+pytest
+```
 
-*\> Note: Benchmarks run on Intel Xeon CPU @ 2.20GHz, 4 vCPUs.*
+The end-to-end fixture still downloads the pinned teacher and student models:
 
-## 📦 Quick Start
+```bash
+neuro-ranker run \
+  --config configs/fixture.json \
+  --work-dir runs/fixture \
+  --repo-root .
+```
 
-The project uses `pyproject.toml` for dependencies and `neurorank` as the central CLI tool.
+## MS MARCO profiles
 
-1.  **Clone and Install Dependencies:**
+| Profile | Train triplets | Eval queries | Candidates/query | Purpose |
+|---|---:|---:|---:|---|
+| `fixture` | 8 synthetic | 2 synthetic | 4 | Offline code and test checks |
+| `smoke` | 512 | 32 | 100 | Rostam end-to-end validation |
+| `artifact` | 100,000 | 6,980 | 1,000 | Reported research run |
 
-    ```bash
-    git clone [https://github.com/yourusername/neurorank.git](https://github.com/yourusername/neurorank.git)
-    cd neurorank
-    # Install the project and all dependencies from pyproject.toml
-    pip install .
-    ```
+MS MARCO is provided for non-commercial research under Microsoft's terms.
+Review those terms before running:
 
-2.  **Build the Production Model:**
-    *If you don't have a pre-trained model, you must run the full training pipeline (train-teacher, train-student) followed by the export step.*
+```bash
+neuro-ranker prepare \
+  --config configs/smoke.json \
+  --output data/smoke \
+  --accept-msmarco-terms
+```
 
-    ```bash
-    # 1. Run the full training pipeline (skipped here for brevity)
-    # 2. Convert the trained .pt model to the final quantized .onnx model
-    bash scripts/build_release_model.sh
-    ```
+The preparation command streams the official training-triplet and top-1000 dev
+archives and does not commit licensed data.
 
-3.  **Run the Service (Recommended: Docker):**
+## Rostam
 
-    ```bash
-    docker-compose up --build
-    ```
+Rostam setup and Slurm commands are in [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
+The short path is:
 
-    *Alternatively, run it locally via the CLI:*
+```bash
+bash scripts/bootstrap_rostam.sh
+MSMARCO_TERMS_ACCEPTED=1 sbatch slurm/smoke.sbatch
+```
 
-    ```bash
-    neurorank runserver --port 8000
-    ```
+Do not report results from the smoke profile as benchmark results. The artifact
+profile and its generated `run_manifest.json` are the evidence for RESULTS.md.
 
-4.  **Test the API:**
-    *Note: The API expects the document list field to be named **`texts`**.*
+## Service
 
-    ```bash
-    curl -X POST "http://localhost:8000/rerank" \
-         -H "Content-Type: application/json" \
-         -d '{"query": "machine learning", "texts": ["intro to ML", "advanced AI", "cooking recipes"]}'
-    ```
+After a successful export:
 
-## 🏗️ Project Structure
+```bash
+neuro-ranker serve \
+  --model runs/fixture/export/student.int8.onnx \
+  --tokenizer runs/fixture/export \
+  --host 127.0.0.1 \
+  --port 8000
+```
 
-  * `src/neuro_ranker/`: Core library for model definitions, encoders, and helpers.
-  * `training_pipeline/`: Scripts for **training**, **distillation**, and **evaluation** (e.g., `train_teacher.py`).
-  * `scripts/`: Utility scripts for data prep, ONNX export, and benchmarking.
-  * `ranker_service/`: FastAPI application for serving the model.
-  * `configs/`: Training configuration files.
+`GET /health` reports model readiness. `POST /rerank` accepts `query`, `texts`,
+and `top_k`. The service loads the ONNX model during application startup, so
+unit tests can inject a deterministic fake encoder without model downloads.
+
+## License
+
+Code is MIT licensed. MS MARCO and downloaded model weights retain their own
+terms and licenses; they are not covered by this repository's MIT license.
 

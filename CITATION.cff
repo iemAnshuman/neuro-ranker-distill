@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this artifact, cite the repository and the exact Git revision."
+title: "NeuroRanker Distill"
+type: software
+authors:
+  - family-names: Agrawal
+    given-names: Anshuman
+repository-code: "https://github.com/iemAnshuman/neuro-ranker-distill"
+license: MIT
+version: 0.2.0
+date-released: 2026-08-22
+
