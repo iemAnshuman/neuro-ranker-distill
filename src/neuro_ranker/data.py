@@ -218,6 +218,23 @@ def _file_record(path: Path, records: int) -> dict[str, Any]:
     }
 
 
+def _validate_prepared_counts(
+    config: dict[str, Any], *, train_records: int, eval_records: int
+) -> None:
+    data_config = config["data"]
+    expected = {
+        "train_triplets": int(data_config["train_records"]),
+        "eval_candidates": int(data_config["eval_queries"])
+        * int(data_config["candidates_per_query"]),
+    }
+    actual = {"train_triplets": train_records, "eval_candidates": eval_records}
+    for name, expected_count in expected.items():
+        if actual[name] != expected_count:
+            raise RuntimeError(
+                f"{name} produced {actual[name]} records; expected {expected_count}"
+            )
+
+
 def prepare_dataset(
     config: dict[str, Any], output_dir: str | Path, accept_msmarco_terms: bool = False
 ) -> dict[str, Any]:
@@ -260,6 +277,9 @@ def prepare_dataset(
         sources = MSMARCO_SOURCES.copy()
         terms_accepted = True
 
+    _validate_prepared_counts(
+        config, train_records=train_records, eval_records=eval_records
+    )
     manifest = {
         "schema_version": 1,
         "profile": profile,

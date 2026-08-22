@@ -55,3 +55,17 @@ def test_source_identity_mismatch_closes_response(monkeypatch):
     with pytest.raises(RuntimeError, match="upstream dev_qrels changed: Content-Length"):
         data_module._request("dev_qrels")
     assert response.closed
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("train_records", 9, "train_triplets produced 8 records; expected 9"),
+        ("eval_queries", 3, "eval_candidates produced 8 records; expected 12"),
+    ],
+)
+def test_preparation_rejects_incomplete_record_counts(tmp_path, field, value, message):
+    config = load_config("configs/fixture.json")
+    config["data"][field] = value
+    with pytest.raises(RuntimeError, match=message):
+        prepare_dataset(config, tmp_path / field)
