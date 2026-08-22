@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import onnx
 import torch
 from onnxruntime import InferenceSession
 from onnxruntime.quantization import QuantType, quantize_dynamic
@@ -44,7 +45,16 @@ def export_student(
     wrapper = ExportEncoder(model).eval()
     tokenizer.save_pretrained(output)
 
-    texts = ["neural information retrieval", "a passage about ranking models"]
+    texts = [
+        "neural information retrieval",
+        "a passage about ranking models",
+        "capital of france",
+        "The Pacific Ocean is the largest ocean.",
+        "how do tensor cores accelerate matrix multiplication",
+        "a deliberately unrelated sentence about gardening",
+        "short",
+        "A longer passage discusses deterministic experiments and provenance.",
+    ]
     tokens = tokenizer(
         texts,
         padding=True,
@@ -84,7 +94,26 @@ def export_student(
         raise RuntimeError(f"ONNX validation failed: max error {fp32_max_error}")
 
     quantized_path = output / "student.int8.onnx"
-    quantize_dynamic(str(onnx_path), str(quantized_path), weight_type=QuantType.QInt8)
+    graph = onnx.load(str(onnx_path), load_external_data=False)
+    hidden_layers = int(model.encoder.config.num_hidden_layers)
+    first_quantized_layer = max(0, hidden_layers - 4)
+    quantized_layers = list(range(first_quantized_layer, hidden_layers))
+    nodes_to_quantize = [
+        node.name
+        for node in graph.graph.node
+        if node.op_type in {"MatMul", "Gemm"}
+        and any(f"/layer.{layer}/" in node.name for layer in quantized_layers)
+    ]
+    if not nodes_to_quantize:
+        raise RuntimeError("no transformer MatMul/Gemm nodes selected for INT8 quantization")
+    quantize_dynamic(
+        str(onnx_path),
+        str(quantized_path),
+        weight_type=QuantType.QInt8,
+        per_channel=True,
+        op_types_to_quantize=["MatMul", "Gemm"],
+        nodes_to_quantize=nodes_to_quantize,
+    )
     int8_output = InferenceSession(str(quantized_path), providers=["CPUExecutionProvider"]).run(
         None, ort_inputs
     )[0]
@@ -92,6 +121,9 @@ def export_student(
     minimum_cosine = float(int8_cosines.min())
     if minimum_cosine < 0.99:
         raise RuntimeError(f"INT8 validation failed: minimum cosine {minimum_cosine}")
+    size_reduction = 1.0 - (quantized_path.stat().st_size / onnx_path.stat().st_size)
+    if size_reduction <= 0:
+        raise RuntimeError("INT8 export is not smaller than FP32")
 
     report = {
         "schema_version": 1,
@@ -105,6 +137,14 @@ def export_student(
             "path": quantized_path.name,
             "sha256": sha256_file(quantized_path),
             "minimum_cosine_similarity": minimum_cosine,
+            "size_reduction_fraction": size_reduction,
+            "quantization_policy": {
+                "format": "dynamic QInt8",
+                "per_channel": True,
+                "op_types": ["MatMul", "Gemm"],
+                "transformer_layers": quantized_layers,
+                "nodes_selected": len(nodes_to_quantize),
+            },
         },
         "validation_texts": texts,
         "opset": 17,
