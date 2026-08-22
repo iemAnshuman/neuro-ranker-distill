@@ -1,10 +1,14 @@
 Bootstrap: docker
 From: nvidia/cuda@sha256:ac55d124da4882b497f732d8dfd9a702d5447a5f29d08d56da6f64f0a1eb34bc
 
+%arguments
+    SOURCE_REVISION=unknown
+
 %labels
     org.opencontainers.image.title NeuroRanker Distill
     org.opencontainers.image.version 0.2.0
     org.opencontainers.image.source https://github.com/iemAnshuman/neuro-ranker-distill
+    org.opencontainers.image.revision {{ SOURCE_REVISION }}
 
 %files
     pyproject.toml /opt/neuro-ranker/
@@ -30,11 +34,13 @@ From: nvidia/cuda@sha256:ac55d124da4882b497f732d8dfd9a702d5447a5f29d08d56da6f64f
     export PATH=/opt/venv/bin:$PATH
     export PYTHONUNBUFFERED=1
     export TOKENIZERS_PARALLELISM=false
+    export NEURORANKER_SOURCE_REVISION={{ SOURCE_REVISION }}
 
 %runscript
     exec /opt/venv/bin/neuro-ranker "$@"
 
 %test
+    test ! -e /opt/neuro-ranker/.git
     work_dir=$(mktemp -d)
     /opt/venv/bin/neuro-ranker prepare --config /opt/neuro-ranker/configs/fixture.json \
         --output "$work_dir/fixture"

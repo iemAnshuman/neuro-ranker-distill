@@ -53,11 +53,13 @@ and an explicit release-file allowlist so Git metadata and local artifacts do
 not enter the image:
 
 ```bash
-apptainer build neuro-ranker.sif containers/neuro-ranker.def
+bash scripts/build_apptainer.sh neuro-ranker.sif
 sha256sum neuro-ranker.sif
 apptainer test --nv neuro-ranker.sif
 ```
 
+The build wrapper refuses a dirty Git tree and embeds the exact source revision
+as an OCI label and `NEURORANKER_SOURCE_REVISION` for provenance collection.
 Record the SIF digest in the run notes. Rostam execution currently uses the
 locked virtual environment so source changes can be tested without rebuilding
 the image; the container is the portable release environment.

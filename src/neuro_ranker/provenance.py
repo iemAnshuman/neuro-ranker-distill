@@ -53,6 +53,7 @@ def _sha256_optional(path: Path) -> str | None:
 
 def collect_provenance(repo_root: str | Path) -> dict[str, Any]:
     root = Path(repo_root).resolve()
+    embedded_revision = os.environ.get("NEURORANKER_SOURCE_REVISION") or None
     packages: dict[str, str] = {}
     for name in TRACKED_PACKAGES:
         try:
@@ -81,6 +82,7 @@ def collect_provenance(repo_root: str | Path) -> dict[str, Any]:
         "executable": os.sys.executable,
         "packages": packages,
         "git": {
+            "embedded_revision": embedded_revision,
             "head": _run(["git", "rev-parse", "HEAD"], root),
             "status": _run(["git", "status", "--porcelain=v1"], root),
             "remote": _run(["git", "remote", "get-url", "origin"], root),
@@ -99,6 +101,9 @@ def collect_provenance(repo_root: str | Path) -> dict[str, Any]:
         "slurm": slurm,
         "environment": {
             "LOADEDMODULES": os.environ.get("LOADEDMODULES", ""),
+            "NEURORANKER_SOURCE_REVISION": os.environ.get(
+                "NEURORANKER_SOURCE_REVISION", ""
+            ),
             "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
             "CUBLAS_WORKSPACE_CONFIG": os.environ.get("CUBLAS_WORKSPACE_CONFIG", ""),
             "HF_HOME": os.environ.get("HF_HOME", ""),
