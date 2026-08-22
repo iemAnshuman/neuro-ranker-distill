@@ -24,11 +24,14 @@ machinery only; the tiny synthetic ranking metrics are not research results.
 
 ### Portable image validation
 
-An Apptainer image built from commit
-`76a8f0d58b0d544220d4eb96ccf60cbbd06c163a` passed its embedded fixture test
-and a CUDA tensor operation on a Rostam A100 with PyTorch `2.7.1+cu128`. The
-finished SIF is `10,825,363,456` bytes with SHA-256
-`83d2a9f0cfea97cc60fcd3729d676c21cc8375b4cdaef206f2e54aeabb43b4bd`.
+Rostam job `186946` built the Apptainer image through the clean-tree wrapper
+from commit `08a0dddde199ab8da5b90bd5b6d381e548d7fe40`. The image label records that
+revision, the embedded test confirmed that Git metadata was excluded, and the
+fixture preparation and verification passed. Dependent A100 job `186947`
+confirmed PyTorch `2.7.1+cu128`, CUDA runtime `12.8`, an NVIDIA A100-PCIE-40GB,
+the embedded source revision, and a CUDA tensor sum of `28`. The finished SIF is
+`10,779,668,480` bytes with SHA-256
+`1d8082e803250b6f58975c1a5c02587e10b7789bbf626a55899d732c97ebdc69`.
 
 The previous README's accuracy, model-size, speedup, and latency numbers were not
 connected to a reproducible run manifest, so they are intentionally not carried
